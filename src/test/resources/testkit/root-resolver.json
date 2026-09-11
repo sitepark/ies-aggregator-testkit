@@ -1,0 +1,48 @@
+{
+  "repository": {
+    "1000": {
+      "id": 1000,
+      "objectType": "content",
+      "anchor": "start-page",
+      "parent": "5000",
+      "content": {
+        "sp_headline": "Start page"
+      }
+    },
+    "1330": {
+      "id": 1330,
+      "objectType": "content",
+      "anchor": "target-page",
+      "parent": "5000",
+      "content": {
+        "sp_headline": "Target page"
+      }
+    },
+    "5000": {
+      "id": 5000,
+      "anchor": "site-root",
+      "group": {
+        "lang": "de",
+        "rootSiteGroup": true,
+        "micrositeRootSiteGroup": false,
+        "subGroups": ["5100"],
+        "entities": ["1000", "1330"]
+      },
+      "content": {
+        "sp_mediaDefaults": {
+          "sp_copyright": "© Site"
+        }
+      }
+    },
+    "5100": {
+      "id": 5100,
+      "anchor": "microsite-root",
+      "parent": "5000",
+      "group": {
+        "lang": "en",
+        "rootSiteGroup": true,
+        "micrositeRootSiteGroup": true
+      }
+    }
+  }
+}
