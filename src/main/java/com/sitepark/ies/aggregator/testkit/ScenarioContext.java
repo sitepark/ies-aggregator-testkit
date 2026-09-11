@@ -108,6 +108,7 @@ public final class ScenarioContext {
 
   private final Repository repository;
   private final ScenarioLayout layout;
+  private final Injector injector;
   private final AssemblerFactory assemblerFactory;
   private final RootResolverFactory rootResolverFactory;
   private final ChannelProvider channelProvider;
@@ -117,14 +118,15 @@ public final class ScenarioContext {
   private ScenarioContext(
       Repository repository,
       ScenarioLayout layout,
-      AssemblerFactory assemblerFactory,
+      Injector injector,
       RootResolverFactory rootResolverFactory,
       ChannelProvider channelProvider,
       ObjectMapper jsonMapper,
       @Nullable Object rawOptions) {
     this.repository = repository;
     this.layout = layout;
-    this.assemblerFactory = assemblerFactory;
+    this.injector = injector;
+    this.assemblerFactory = injector.getInstance(AssemblerFactory.class);
     this.rootResolverFactory = rootResolverFactory;
     this.channelProvider = channelProvider;
     this.jsonMapper = jsonMapper;
@@ -202,13 +204,7 @@ public final class ScenarioContext {
                 new ScenarioObjectTypeConfigProvider(mapper, raw.get(OBJECT_TYPE_KEY))));
 
     return new ScenarioContext(
-        repository,
-        layout,
-        injector.getInstance(AssemblerFactory.class),
-        rootResolverFactory,
-        channelProvider,
-        mapper,
-        rawOptions);
+        repository, layout, injector, rootResolverFactory, channelProvider, mapper, rawOptions);
   }
 
   /**
@@ -218,6 +214,20 @@ public final class ScenarioContext {
       ObjectMapper mapper, Map<String, Object> raw) {
     Object access = raw.get(ACCESS_KEY);
     return access == null ? null : mapper.convertValue(access, AccessRestriction.class);
+  }
+
+  /**
+   * Builds the aggregator under test the way the production container builds it: from its
+   * {@code @Inject} constructor, with the harness's ports and assembler factory injected.
+   *
+   * <p>This is how a project reaches an aggregator of a library it extends - their constructors are
+   * package-private on purpose, as production never calls them either.
+   *
+   * @param type the aggregator class
+   * @param <T> the aggregator type
+   */
+  public <T> T aggregator(Class<T> type) {
+    return this.injector.getInstance(type);
   }
 
   /** Returns the wired assembler factory to hand to the aggregator under test. */

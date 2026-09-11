@@ -62,7 +62,7 @@ static List<Scenario> scenarios() {
 void producesExpectedOutput(Scenario scenario) {
   ScenarioContext context = MyScenario.load(scenario.inputResource());
 
-  TextSectionAggregator aggregator = new TextSectionAggregator(context.assemblerFactory());
+  TextSectionAggregator aggregator = context.aggregator(TextSectionAggregator.class);
   aggregator.setOptions(context.options(TextOptions.class));
 
   assertThat(context.aggregate(aggregator::aggregateSectionType, "text"))
@@ -73,6 +73,11 @@ void producesExpectedOutput(Scenario scenario) {
 
 `Scenarios.discover(dir)` finds every `<name>.json` in a classpath directory and pairs it with
 `<name>.expected.json`. A new case is two files, no test code.
+
+`context.aggregator(Class)` builds the aggregator under test the way the production container
+does - from its `@Inject` constructor, with the harness's ports injected. That is how a project
+reaches the aggregators of a library it extends: their constructors are package-private, as
+production never calls them either.
 
 ## A scenario file
 
