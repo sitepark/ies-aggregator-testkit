@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="Aggregator Testkit RuleSet"
+  xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+  <description>Aggregator Testkit PMD RuleSet</description>
+
+  <!-- Duplicate literals are acceptable in tests (fixture data, expected values). -->
+  <rule ref="category/java/errorprone.xml/AvoidDuplicateLiterals">
+    <properties>
+      <property name="violationSuppressXPath"
+        value="./ancestor-or-self::ClassDeclaration[matches(@SimpleName, '^.*Test')]"/>
+    </properties>
+  </rule>
+
+  <!-- The central visitor dispatches on every supported value type, so it references them all. -->
+  <rule ref="category/java/design.xml/CouplingBetweenObjects">
+    <properties>
+      <property name="threshold" value="25"/>
+    </properties>
+  </rule>
+
+  <!-- Empty catch blocks are allowed when the intent is documented with a comment. -->
+  <rule ref="category/java/errorprone.xml/EmptyCatchBlock">
+    <properties>
+      <property name="allowCommentedBlocks" value="true"/>
+    </properties>
+  </rule>
+
+  <!-- Best Practices -->
+  <rule ref="category/java/bestpractices.xml">
+    <!-- Tests deliberately group several assertions per behavior. -->
+    <exclude name="UnitTestContainsTooManyAsserts"/>
+    <!-- Visitor dispatch methods take a fixed Object[]; varargs would weaken the contract. -->
+    <exclude name="UseVarargs"/>
+    <!-- Factory methods normalize their input parameter on purpose. -->
+    <exclude name="AvoidReassigningParameters"/>
+    <!-- Single-method capability interfaces are intentionally not marked @FunctionalInterface. -->
+    <exclude name="ImplicitFunctionalInterface"/>
+    <!-- The Visitor base class provides overridable no-op hooks; abstract methods are not wanted. -->
+    <exclude name="AbstractClassWithoutAbstractMethod"/>
+  </rule>
+
+  <!-- Design -->
+  <rule ref="category/java/design.xml">
+    <!-- The Visitor and serializer classes have one method per output type by design. -->
+    <exclude name="TooManyMethods"/>
+    <exclude name="GodClass"/>
+    <exclude name="CyclomaticComplexity"/>
+    <!-- AggregatorException is documented in throws clauses on purpose. -->
+    <exclude name="AvoidUncheckedExceptionsInSignatures"/>
+    <!-- Too noisy: flags ordinary calls on local variables holding method results. -->
+    <exclude name="LawOfDemeter"/>
+    <!-- Requires an explicit package list to do anything; unconfigured it is dropped with a warning. -->
+    <exclude name="LoosePackageCoupling"/>
+    <!-- Configured separately above. -->
+    <exclude name="CouplingBetweenObjects"/>
+  </rule>
+
+  <!-- Error Prone -->
+  <rule ref="category/java/errorprone.xml">
+    <!-- Record-style accessors (no get/is prefix) intentionally match their field names. -->
+    <exclude name="AvoidFieldNameMatchingMethodName"/>
+    <exclude name="AvoidFieldNameMatchingTypeName"/>
+    <!-- Meaningful sentinel literals (e.g. control-character boundary 0x20) read clearer inline. -->
+    <exclude name="AvoidLiteralsInIfCondition"/>
+    <!-- Clearing references to release state is an accepted pattern here. -->
+    <exclude name="NullAssignment"/>
+    <!-- Configured separately above. -->
+    <exclude name="AvoidDuplicateLiterals"/>
+    <exclude name="EmptyCatchBlock"/>
+  </rule>
+
+  <!-- Performance -->
+  <rule ref="category/java/performance.xml"/>
+
+  <!-- Security -->
+  <rule ref="category/java/security.xml"/>
+
+  <!-- Multithreading -->
+  <rule ref="category/java/multithreading.xml">
+    <!-- The output model is single-threaded; a plain LinkedHashMap preserves insertion order. -->
+    <exclude name="UseConcurrentHashMap"/>
+  </rule>
+
+</ruleset>

@@ -1,0 +1,449 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>com.sitepark.ies</groupId>
+	<artifactId>ies-aggregator-testkit</artifactId>
+	<version>1.0.0-SNAPSHOT</version>
+
+	<name>IES Aggregator Testkit</name>
+	<description>Scenario harness for IES aggregators: loads a JSON scenario as an in-memory CMS,
+		wires the real assembler chain around it through the ports of the aggregator API, and
+		compares the aggregated resource with a golden file.</description>
+	<url>https://github.com/sitepark/ies-aggregator-testkit</url>
+
+	<organization>
+		<name>Sitepark</name>
+		<url>https://www.sitepark.com</url>
+	</organization>
+
+	<licenses>
+		<license>
+			<name>The MIT License</name>
+			<url>https://opensource.org/licenses/MIT</url>
+		</license>
+	</licenses>
+	<developers>
+		<developer>
+			<id>veltrup@sitepark</id>
+			<name>Holger Veltrup</name>
+			<email>veltrup@sitepark.com</email>
+			<url>https://github.com/sitepark-veltrup</url>
+			<organization>Sitepark</organization>
+			<organizationUrl>https://www.sitepark.com</organizationUrl>
+			<roles>
+				<role>developer</role>
+			</roles>
+			<timezone>Europe/Berlin</timezone>
+		</developer>
+	</developers>
+
+	<scm>
+		<connection>scm:git:git@github.com:sitepark/ies-aggregator-testkit.git</connection>
+		<developerConnection>scm:git:git@github.com:sitepark/ies-aggregator-testkit.git</developerConnection>
+		<tag>HEAD</tag>
+		<url>https://github.com/sitepark/ies-aggregator-testkit</url>
+	</scm>
+
+	<properties>
+		<junit.version>6.1.0</junit.version>
+		<mockito.version>5.23.0</mockito.version>
+		<errorprone.version>2.49.0</errorprone.version>
+		<nullaway.version>0.13.7</nullaway.version>
+		<pmd.version>7.17.0</pmd.version>
+		<gpg.skip>true</gpg.skip>
+		<maven.compiler.release>25</maven.compiler.release>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.junit</groupId>
+				<artifactId>junit-bom</artifactId>
+				<version>${junit.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<dependencies>
+
+		<!-- The API this harness drives. Provided: every consumer has it on its own terms. -->
+		<dependency>
+			<groupId>com.sitepark.ies</groupId>
+			<artifactId>ies-aggregator</artifactId>
+			<version>1.0.0-SNAPSHOT</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.jspecify</groupId>
+			<artifactId>jspecify</artifactId>
+			<version>1.0.0</version>
+		</dependency>
+
+		<!-- Reads the JSON scenario into the in-memory repository, binds structured values and the
+		     option blocks. The aggregator API itself is Jackson-free; a test harness may afford it. -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+			<version>2.21.2</version>
+		</dependency>
+
+		<!-- Classpath scanning to discover @AssemblerBinding classes. The production class finder
+		     walks the entries of a registered extension JAR; a test has only target/test-classes. -->
+		<dependency>
+			<groupId>io.github.classgraph</groupId>
+			<artifactId>classgraph</artifactId>
+			<version>4.8.184</version>
+		</dependency>
+
+		<!-- Constructor injection for the discovered assemblers and their collaborators, the way
+		     the production container does it: the harness binds the ports and lets the injector
+		     build everything else from the @Inject constructors. Version and classifier as IES
+		     pins them - 7 is the jakarta.inject generation, and the "classes" variant is the one
+		     without the repackaged ASM/cglib that only AOP needs. Guava and aopalliance come along
+		     either way, they are ordinary dependencies of both variants. -->
+		<dependency>
+			<groupId>com.google.inject</groupId>
+			<artifactId>guice</artifactId>
+			<version>7.0.0</version>
+			<classifier>classes</classifier>
+		</dependency>
+
+		<!-- Test-Dependencies -->
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-api</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-engine</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<version>${mockito.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.assertj</groupId>
+			<artifactId>assertj-core</artifactId>
+			<version>3.27.7</version>
+			<scope>test</scope>
+		</dependency>
+
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.15.0</version>
+				<configuration>
+					<compilerArgs>
+						<arg>-XDcompilePolicy=simple</arg>
+						<arg>--should-stop=ifError=FLOW</arg>
+						<arg>-Xplugin:ErrorProne -Xep:NullAway:ERROR -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:AnnotatedPackages=com.sitepark.ies.aggregator</arg>
+						<arg>-Werror</arg>
+					</compilerArgs>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>com.google.errorprone</groupId>
+							<artifactId>error_prone_core</artifactId>
+							<version>${errorprone.version}</version>
+						</path>
+						<path>
+							<groupId>com.uber.nullaway</groupId>
+							<artifactId>nullaway</artifactId>
+							<version>${nullaway.version}</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+				<executions>
+					<!-- Test code: Error Prone on, NullAway off (tests pass null intentionally) -->
+					<execution>
+						<id>default-testCompile</id>
+						<configuration>
+							<compilerArgs combine.self="override">
+								<arg>-XDcompilePolicy=simple</arg>
+								<arg>--should-stop=ifError=FLOW</arg>
+								<arg>-Xplugin:ErrorProne -Xep:NullAway:OFF</arg>
+							</compilerArgs>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>3.5.0</version>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>3.5.6</version>
+				<configuration>
+					<argLine>@{argLine}</argLine>
+					<consoleOutputReporter>
+						<disable>true</disable>
+					</consoleOutputReporter>
+					<statelessTestsetInfoReporter implementation="org.apache.maven.plugin.surefire.extensions.junit5.JUnit5StatelessTestsetInfoTreeReporter">
+						<hideResultsOnSuccess>true</hideResultsOnSuccess>
+						<theme>UNICODE</theme>
+					</statelessTestsetInfoReporter>
+				</configuration>
+				<dependencies>
+					<dependency>
+						<groupId>me.fabriciorby</groupId>
+						<artifactId>maven-surefire-junit5-tree-reporter</artifactId>
+						<version>1.5.1</version>
+					</dependency>
+				</dependencies>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-source-plugin</artifactId>
+				<version>3.4.0</version>
+				<executions>
+					<execution>
+						<id>attach-sources</id>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>3.12.0</version>
+				<configuration>
+					<doclint>all,-missing</doclint>
+				</configuration>
+				<executions>
+					<execution>
+						<id>attach-javadocs</id>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-gpg-plugin</artifactId>
+				<version>3.2.8</version>
+				<executions>
+					<execution>
+						<id>sign-artifacts</id>
+						<goals>
+							<goal>sign</goal>
+						</goals>
+						<phase>verify</phase>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<artifactId>maven-release-plugin</artifactId>
+				<version>3.3.1</version>
+				<configuration>
+					<scmCommentPrefix>ci(release):</scmCommentPrefix>
+					<tagNameFormat>@{project.version}</tagNameFormat>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-enforcer-plugin</artifactId>
+				<version>3.6.3</version>
+				<executions>
+					<execution>
+						<id>enforce-maven</id>
+						<goals>
+							<goal>enforce</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<banDuplicatePomDependencyVersions/>
+								<requireJavaVersion>
+									<version>25</version>
+								</requireJavaVersion>
+								<requireMavenVersion>
+									<version>3.8</version>
+								</requireMavenVersion>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.14</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>jacoco-check</id>
+						<goals>
+							<goal>check</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<rule>
+									<element>BUNDLE</element>
+									<limits>
+										<!-- A harness is exercised by the projects that use it, not by its own tests:
+										     the five tests here cover the discovery and lookup semantics and the
+										     repository doubles, while the scenario context itself runs in every
+										     consumer's scenario suite. The floors are the measured state of the own
+										     tests; raise them as tests grow, do not lower them. -->
+										<limit>
+											<counter>LINE</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>0.45</minimum>
+										</limit>
+										<limit>
+											<counter>BRANCH</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>0.45</minimum>
+										</limit>
+									</limits>
+								</rule>
+							</rules>
+						</configuration>
+					</execution>
+					<execution>
+						<id>generate-code-coverage-report</id>
+						<goals>
+							<goal>report</goal>
+						</goals>
+						<phase>test</phase>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>com.diffplug.spotless</groupId>
+				<artifactId>spotless-maven-plugin</artifactId>
+				<version>3.6.0</version>
+				<configuration>
+					<java>
+						<googleJavaFormat>
+							<formatJavadoc>false</formatJavadoc>
+							<reflowLongStrings>true</reflowLongStrings>
+							<style>GOOGLE</style>
+							<version>1.31.0</version>
+						</googleJavaFormat>
+						<removeUnusedImports>
+							<engine>google-java-format</engine>
+						</removeUnusedImports>
+					</java>
+					<pom>
+						<includes>
+							<include>pom.xml</include>
+						</includes>
+						<sortPom>
+							<!--  value of -1 indicates that a tab character should be used instead -->
+							<nrOfIndentSpace>-1</nrOfIndentSpace>
+						</sortPom>
+					</pom>
+				</configuration>
+				<executions>
+					<execution>
+						<id>spotless-apply</id>
+						<goals>
+							<goal>apply</goal>
+						</goals>
+						<phase>process-sources</phase>
+						<configuration>
+							<skip>${spotless.apply.skip}</skip>
+						</configuration>
+					</execution>
+					<execution>
+						<id>spotless-check</id>
+						<?m2e ignore?>
+						<goals>
+							<goal>check</goal>
+						</goals>
+						<phase>verify</phase>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-pmd-plugin</artifactId>
+				<version>3.28.0</version>
+				<configuration>
+					<failOnViolation>true</failOnViolation>
+					<failurePriority>5</failurePriority>
+					<includeTests>true</includeTests>
+					<linkXRef>false</linkXRef>
+					<printFailingErrors>true</printFailingErrors>
+					<rulesets>
+						<ruleset>pmd-ruleset.xml</ruleset>
+					</rulesets>
+				</configuration>
+				<dependencies>
+					<dependency>
+						<groupId>net.sourceforge.pmd</groupId>
+						<artifactId>pmd-core</artifactId>
+						<version>${pmd.version}</version>
+					</dependency>
+					<dependency>
+						<groupId>net.sourceforge.pmd</groupId>
+						<artifactId>pmd-java</artifactId>
+						<version>${pmd.version}</version>
+					</dependency>
+				</dependencies>
+				<executions>
+					<execution>
+						<id>pmd</id>
+						<goals>
+							<goal>check</goal>
+						</goals>
+						<phase>verify</phase>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+	<profiles>
+		<profile>
+			<id>ci</id>
+			<activation>
+				<property>
+					<name>env.CI</name>
+				</property>
+			</activation>
+			<properties>
+				<spotless.apply.skip>true</spotless.apply.skip>
+			</properties>
+		</profile>
+		<profile>
+			<id>publish-release</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.sonatype.central</groupId>
+						<artifactId>central-publishing-maven-plugin</artifactId>
+						<version>0.10.0</version>
+						<extensions>true</extensions>
+						<configuration>
+							<autoPublish>true</autoPublish>
+							<publishingServerId>central</publishingServerId>
+							<waitUntil>published</waitUntil>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+</project>
