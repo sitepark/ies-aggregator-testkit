@@ -33,51 +33,65 @@ flowchart LR
 </dependency>
 ```
 
+The base class below is JUnit and AssertJ; the harness declares both as `provided`, so a project
+brings `junit-jupiter-params` and `assertj-core` along on its own terms — as it does anyway to write
+tests at all.
+
 The harness does not know what your resource looks like — which area holds the content, how the
 root of the component tree is marked, which container a section is aggregated into. You tell it
-once, with a `ScenarioLayout`, ideally built from the constants of your resource model so there is
-nothing to keep in step:
+once, in a base class of your own, ideally built from the constants of your resource model so there
+is nothing to keep in step:
 
 ```java
-public final class MyScenario {
+abstract class SectionTypeScenarioTest<A extends SectionTypeAggregator> extends ScenarioTest {
 
-  static final ScenarioLayout LAYOUT =
-      new ScenarioLayout(Resource.CONTENT, Resource.CONTENT_ROOT, "main", "main");
+  private final Class<A> type;
+  private final String componentType;
 
-  static ScenarioContext load(String resource) {
-    return ScenarioContext.load(resource, LAYOUT);
+  protected SectionTypeScenarioTest(Class<A> type, String componentType, String... directories) {
+    super(directories);
+    this.type = type;
+    this.componentType = componentType;
+  }
+
+  @Override
+  protected ScenarioLayout layout() {
+    return new ScenarioLayout(Resource.CONTENT, Resource.CONTENT_ROOT, "main", "main");
+  }
+
+  @Override
+  protected String aggregate(ScenarioContext context) {
+    return context.aggregate(
+        context.aggregator(this.type)::aggregateSectionType, this.componentType);
   }
 }
 ```
 
-A scenario test then reads like this — one method per section type, one file pair per case:
+One such class per kind of aggregation a project has — a section type, an area of the resource, the
+meta file of an embedded medium. A suite is then what it is about, and nothing else:
 
 ```java
-static List<Scenario> scenarios() {
-  return Scenarios.discover("scenarios/text");
-}
+class TextAggregatorTest extends SectionTypeScenarioTest<TextSectionAggregator> {
 
-@ParameterizedTest(name = "{0}")
-@MethodSource("scenarios")
-void producesExpectedOutput(Scenario scenario) {
-  ScenarioContext context = MyScenario.load(scenario.inputResource());
-
-  TextSectionAggregator aggregator = context.aggregator(TextSectionAggregator.class);
-  aggregator.setOptions(context.options(TextOptions.class));
-
-  assertThat(context.aggregate(aggregator::aggregateSectionType, "text"))
-      .as("aggregated text output for scenario '%s'", scenario.name())
-      .isEqualTo(context.expected(scenario.expectedResource()));
+  TextAggregatorTest() {
+    super(TextSectionAggregator.class, "text", "scenarios/text");
+  }
 }
 ```
 
-`Scenarios.discover(dir)` finds every `<name>.json` in a classpath directory and pairs it with
-`<name>.expected.json`. A new case is two files, no test code.
+Every `<name>.json` under `scenarios/text` runs as its own parameterized case and its output is
+compared with `<name>.expected.json`. A new case is two files, no code. Several directories may feed
+one suite; they are read in the order given.
 
-`context.aggregator(Class)` builds the aggregator under test the way the production container
-does - from its `@Inject` constructor, with the harness's ports injected. That is how a project
-reaches the aggregators of a library it extends: their constructors are package-private, as
-production never calls them either.
+A suite may add tests of its own beside the inherited one — it is an ordinary test class, and
+`load(resource)` opens a single scenario for them. Where the base class does not fit, its pieces are
+still there on their own: `Scenarios.discover(dirs)`, `ScenarioContext.load(resource, layout)`,
+`context.aggregate(…)`.
+
+`context.aggregator(Class)` builds the aggregator under test the way the production container does —
+from its `@Inject` constructor, with the harness's ports injected, and, if it is `OptionsAware`, with
+the options of the scenario set. That is also how a project reaches the aggregators of a library it
+extends: their constructors are package-private, as production never calls them either.
 
 ## A scenario file
 
@@ -129,6 +143,7 @@ section reaches the page the way production answers it.
 ## On coverage
 
 The harness is exercised by the scenario suites of the projects that use it, not by its own tests.
-The tests here cover the discovery and lookup semantics of the assembler factory and the repository
-doubles; the coverage floor in `pom.xml` is the measured state of those tests, and it is meant to be
-raised, not lowered.
+The tests here cover the discovery and lookup semantics of the assembler factory, the repository
+doubles, and — through a probe suite that uses the harness the way a project does — the base class
+and the options it sets. The coverage floor in `pom.xml` is the measured state of those tests, and
+it is meant to be raised, not lowered.
