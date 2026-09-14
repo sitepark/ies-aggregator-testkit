@@ -6,6 +6,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -25,12 +26,25 @@ public final class Scenarios {
   private static final String EXPECTED_SUFFIX = ".expected.json";
 
   /**
-   * Returns all scenarios found directly under the given classpath directory, sorted by name.
+   * Returns all scenarios found directly under the given classpath directories, sorted by name
+   * within each directory.
    *
-   * @param directory the classpath directory to scan (e.g. {@code "scenarios/content-artdirection"})
-   * @throws IllegalStateException if the directory does not exist on the classpath
+   * <p>Several directories are for a subject that is covered from more than one angle - one
+   * aggregator, two techniques, say - and whose cases would be misleading if they were mixed into
+   * one directory.
+   *
+   * @param directories the classpath directories to scan (e.g. {@code
+   *     "scenarios/content-artdirection"})
+   * @throws IllegalStateException if a directory does not exist on the classpath
    */
-  public static List<Scenario> discover(String directory) {
+  public static List<Scenario> discover(String... directories) {
+    if (directories.length == 1) {
+      return discoverOne(directories[0]);
+    }
+    return Arrays.stream(directories).map(Scenarios::discoverOne).flatMap(List::stream).toList();
+  }
+
+  private static List<Scenario> discoverOne(String directory) {
     Path dir = locate(directory);
     try (Stream<Path> files = Files.list(dir)) {
       return files

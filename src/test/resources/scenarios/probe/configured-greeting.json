@@ -1,0 +1,14 @@
+{
+  "options": {
+    "greeting": "Hello"
+  },
+  "repository": {
+    "1000": {
+      "id": 1000,
+      "objectType": "content",
+      "content": {
+        "sp_headline": "A headline"
+      }
+    }
+  }
+}
