@@ -9,6 +9,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.sitepark.ies.aggregator.Aggregator;
 import com.sitepark.ies.aggregator.Options;
+import com.sitepark.ies.aggregator.OptionsAware;
 import com.sitepark.ies.aggregator.RootAggregator;
 import com.sitepark.ies.aggregator.output.Component;
 import com.sitepark.ies.aggregator.output.DomainObjectMapper;
@@ -29,6 +30,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -221,13 +224,51 @@ public final class ScenarioContext {
    * {@code @Inject} constructor, with the harness's ports and assembler factory injected.
    *
    * <p>This is how a project reaches an aggregator of a library it extends - their constructors are
-   * package-private on purpose, as production never calls them either.
+   * package-private on purpose, as production never calls them either. An aggregator that declares
+   * {@link OptionsAware} is handed the scenario's options as well, again as production does it, so
+   * a test never sets them by hand.
    *
    * @param type the aggregator class
    * @param <T> the aggregator type
    */
   public <T> T aggregator(Class<T> type) {
-    return this.injector.getInstance(type);
+    T aggregator = this.injector.getInstance(type);
+    if (aggregator instanceof OptionsAware<?> optionsAware) {
+      this.setOptions(optionsAware);
+    }
+    return aggregator;
+  }
+
+  /**
+   * Hands the aggregator the scenario's options, the way the production container does: the option
+   * type comes from the {@link OptionsAware} declaration, the values from the scenario's {@code
+   * options} block.
+   */
+  private <O extends Options> void setOptions(OptionsAware<O> optionsAware) {
+    @SuppressWarnings("unchecked")
+    Class<O> optionType = (Class<O>) optionTypeOf(optionsAware.getClass());
+    if (optionType != null) {
+      optionsAware.setOptions(this.options(optionType));
+    }
+  }
+
+  /**
+   * The type argument the class declares for {@link OptionsAware}, walking up its superclasses - an
+   * aggregator declares it on itself, but may inherit the declaration.
+   *
+   * @return the option type, or {@code null} if the declaration is raw
+   */
+  private static @Nullable Class<?> optionTypeOf(Class<?> aggregatorType) {
+    for (Class<?> current = aggregatorType; current != null; current = current.getSuperclass()) {
+      for (Type declared : current.getGenericInterfaces()) {
+        if (declared instanceof ParameterizedType parameterized
+            && parameterized.getRawType() == OptionsAware.class
+            && parameterized.getActualTypeArguments()[0] instanceof Class<?> optionType) {
+          return optionType;
+        }
+      }
+    }
+    return null;
   }
 
   /** Returns the wired assembler factory to hand to the aggregator under test. */
