@@ -16,8 +16,18 @@ import org.junit.jupiter.api.Test;
  */
 class ScenarioChannelTest {
 
+  private static final String CHANNEL_SCENARIO = "testkit/channel.json";
+
+  /** Any layout will do: these tests never aggregate, they only ask the channel. */
+  private static final ScenarioLayout LAYOUT =
+      new ScenarioLayout("area", "root", "container", "container");
+
   private static Channel channel(Map<String, Object> entries) {
-    return new ScenarioChannelProvider(new Repository(entries), null).current();
+    return channel(entries, ScenarioChannelConfig.EMPTY);
+  }
+
+  private static Channel channel(Map<String, Object> entries, ScenarioChannelConfig config) {
+    return new ScenarioChannelProvider(new Repository(entries), null, config).current();
   }
 
   @Test
@@ -59,6 +69,52 @@ class ScenarioChannelTest {
     assertThat(channel.resolveUri(UriTarget.ofMedia(1000, 4712)).map(Object::toString))
         .as("only the binary target resolves for a medium")
         .contains("https://example.com/media/1000/4712");
+  }
+
+  @Test
+  void declaresNoNatureUnlessTheScenarioNamesOne() {
+    Channel channel = channel(Map.of("1000", Map.of("id", 1000)));
+
+    assertThat(channel.nature())
+        .as("a scenario that names no nature gets a channel that declares none, as production does")
+        .isEmpty();
+  }
+
+  @Test
+  void answersTheNatureTheScenarioNames() {
+    Channel channel =
+        channel(Map.of("1000", Map.of("id", 1000)), ScenarioChannelConfig.of("intranet", Map.of()));
+
+    assertThat(channel.nature())
+        .as("a rule keyed to an internal web has to be shown the scenario that declares one")
+        .contains("intranet");
+  }
+
+  @Test
+  void answersOnlyTheAttributesTheScenarioNames() {
+    Channel channel =
+        channel(
+            Map.of("1000", Map.of("id", 1000)),
+            ScenarioChannelConfig.of(null, Map.of("sp_vv_mode", "intern")));
+
+    assertThat(channel.attribute("sp_vv_mode"))
+        .as("the attribute the scenario sets is answered verbatim")
+        .contains("intern");
+    assertThat(channel.attribute("sp_vv_isIntern"))
+        .as("an attribute nobody set stays unset - it is not the same as set to false")
+        .isEmpty();
+  }
+
+  @Test
+  void readsNatureAndAttributesFromTheScenarioFile() {
+    Channel channel = ScenarioContext.load(CHANNEL_SCENARIO, LAYOUT).channel();
+
+    assertThat(channel.nature())
+        .as("the nature the scenario file declares reaches the channel")
+        .contains("intranet");
+    assertThat(channel.attribute("sp_vv_mode"))
+        .as("so does an attribute below the channel block")
+        .contains("intern");
   }
 
   @Test

@@ -1,0 +1,17 @@
+{
+  "channel": {
+    "nature": "intranet",
+    "attributes": {
+      "sp_vv_mode": "intern"
+    }
+  },
+  "repository": {
+    "1000": {
+      "id": 1000,
+      "objectType": "content",
+      "content": {
+        "sp_headline": "Start page"
+      }
+    }
+  }
+}

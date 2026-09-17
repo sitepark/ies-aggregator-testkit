@@ -99,6 +99,13 @@ public final class ScenarioContext {
   public static final String VARIANT_CONFIG_KEY = "variantConfig";
 
   /**
+   * Top-level key in a scenario file carrying what the channel says about itself: {@code {"nature":
+   * "intranet", "attributes": {"name": "value"}}}. An absent block means a channel that declares
+   * neither — the same answer a publisher with nothing configured gives.
+   */
+  public static final String CHANNEL_KEY = "channel";
+
+  /**
    * Id of the repository entry the aggregation starts from in every scenario (by convention
    * {@code 1000}). {@link #aggregate} resolves it as the entry point of the aggregation and reuses
    * it as the id of the aggregated component.
@@ -192,7 +199,8 @@ public final class ScenarioContext {
 
     RootResolverFactory rootResolverFactory = new ScenarioRootResolverFactory(repository);
     ChannelProvider channelProvider =
-        new ScenarioChannelProvider(repository, accessRestriction(mapper, raw));
+        new ScenarioChannelProvider(
+            repository, accessRestriction(mapper, raw), channelConfig(mapper, raw));
     // Only the ports are wired by hand; every assembler and every collaborator behind them is built
     // by the injector from its @Inject constructor, the way the production container does it.
     Injector injector =
@@ -217,6 +225,17 @@ public final class ScenarioContext {
       ObjectMapper mapper, Map<String, Object> raw) {
     Object access = raw.get(ACCESS_KEY);
     return access == null ? null : mapper.convertValue(access, AccessRestriction.class);
+  }
+
+  /**
+   * Reads what the scenario's channel declares about itself; an absent block leaves the channel
+   * without a nature and without a single attribute.
+   */
+  private static ScenarioChannelConfig channelConfig(ObjectMapper mapper, Map<String, Object> raw) {
+    Object channel = raw.get(CHANNEL_KEY);
+    return channel == null
+        ? ScenarioChannelConfig.EMPTY
+        : mapper.convertValue(channel, ScenarioChannelConfig.class);
   }
 
   /**
