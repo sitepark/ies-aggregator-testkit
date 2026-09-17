@@ -22,10 +22,16 @@ final class ScenarioChannelProvider implements ChannelProvider {
    *     standalone media and therefore have no page URL
    * @param accessRestriction the restriction both channels report, or {@code null} for an
    *     unrestricted resource
+   * @param config the nature and attributes both channels report
    */
-  ScenarioChannelProvider(Repository repository, @Nullable AccessRestriction accessRestriction) {
-    this.currentChannel = new ScenarioChannel(1, "Current Channel", accessRestriction, repository);
-    this.primaryChannel = new ScenarioChannel(2, "Primary Channel", accessRestriction, repository);
+  ScenarioChannelProvider(
+      Repository repository,
+      @Nullable AccessRestriction accessRestriction,
+      ScenarioChannelConfig config) {
+    this.currentChannel =
+        new ScenarioChannel(1, "Current Channel", accessRestriction, repository, config);
+    this.primaryChannel =
+        new ScenarioChannel(2, "Primary Channel", accessRestriction, repository, config);
   }
 
   @Override

@@ -31,13 +31,19 @@ final class ScenarioChannel implements Channel {
   private final String name;
   private final @Nullable AccessRestriction accessRestriction;
   private final Repository repository;
+  private final ScenarioChannelConfig config;
 
   ScenarioChannel(
-      int id, String name, @Nullable AccessRestriction accessRestriction, Repository repository) {
+      int id,
+      String name,
+      @Nullable AccessRestriction accessRestriction,
+      Repository repository,
+      ScenarioChannelConfig config) {
     this.id = id;
     this.name = name;
     this.accessRestriction = accessRestriction;
     this.repository = repository;
+    this.config = config;
   }
 
   @Override
@@ -62,6 +68,24 @@ final class ScenarioChannel implements Channel {
   @Override
   public Optional<AccessRestriction> accessRestriction(int objectId) {
     return Optional.ofNullable(this.accessRestriction);
+  }
+
+  /**
+   * What the scenario's {@code channel} block names, and nothing more.
+   *
+   * <p>A scenario that names no nature leaves this empty, exactly as a publisher that declares none
+   * does. Answering a default here would let a rule keyed to the public web pass without the
+   * scenario ever having said which web it is.
+   */
+  @Override
+  public Optional<String> nature() {
+    return Optional.ofNullable(this.config.nature());
+  }
+
+  /** The attributes the scenario's {@code channel} block names; every other name stays empty. */
+  @Override
+  public Optional<String> attribute(String name) {
+    return Optional.ofNullable(this.config.attributes().get(name));
   }
 
   /**
