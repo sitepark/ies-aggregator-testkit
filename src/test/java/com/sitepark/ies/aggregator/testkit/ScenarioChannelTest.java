@@ -31,11 +31,23 @@ class ScenarioChannelTest {
   }
 
   @Test
-  void answersNoPageUrlForAStandaloneMedium() {
+  void answersTheMediaUrlForAStandaloneMedium() {
     Channel channel = channel(Map.of("1000", Map.of("id", 1000, "media", Map.of("id", 4712))));
 
+    assertThat(channel.resolveUri(UriTarget.ofObject(1000)).map(Object::toString))
+        .as(
+            "a standalone medium has no page of its own, so an object target answers with the"
+                + " download URL of the medium it publishes - the caller must not have to know"
+                + " what kind of object it is pointing at")
+        .contains("https://example.com/media/1000/4712");
+  }
+
+  @Test
+  void answersNothingForAStandaloneMediumWithoutAnAssetId() {
+    Channel channel = channel(Map.of("1000", Map.of("id", 1000, "media", Map.of())));
+
     assertThat(channel.resolveUri(UriTarget.ofObject(1000)))
-        .as("a standalone medium is published under its binary and has no page of its own")
+        .as("without an asset id there is no binary to name, and no page URL is invented for it")
         .isEmpty();
   }
 

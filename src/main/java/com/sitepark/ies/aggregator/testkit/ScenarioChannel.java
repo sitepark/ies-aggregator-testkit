@@ -13,14 +13,17 @@ import org.jspecify.annotations.Nullable;
  * the publication would</em>: a media binary to a download URL of object and media id, a page to a
  * page URL of its object id.
  *
- * <p>A standalone medium is registered under its binary only, so {@link UriTarget.ObjectTarget}
- * stays unanswered for it and only {@link UriTarget.MediaTarget} resolves - exactly as the
- * production channel behaves, where a media resource has no row without a binary id. A scenario
- * that links to a medium therefore gets an empty internal link, which is the right answer even
- * though it looks like a testkit defect.
+ * <p>A standalone medium is registered under its binary only - it has no row without a binary id -
+ * so it never gets a page URL. An {@link UriTarget.ObjectTarget} on one is answered with the
+ * download URL of the medium it publishes, exactly as the production channel does: linking a medium
+ * internally is an ordinary thing for an editor to do, and the caller is not made to find out what
+ * kind of object it is pointing at first.
  *
- * <p>An earlier version answered every target alike. That generosity hid a published bug: 322 media
- * meta pages went out with {@code "url" => ".meta.php"} while every scenario stayed green.
+ * <p>Two things this must not go back to. An early version answered every target with a page URL:
+ * that generosity hid a published bug, 322 media meta pages went out with {@code "url" =>
+ * ".meta.php"} while every scenario stayed green. The version after it answered nothing at all for
+ * a medium, which was right about the page URL and wrong about the link - production dropped the
+ * whole link, and no scenario could show it.
  *
  * <p>The URLs are absolute, again like the production channel, which hands out {@code baseUrl +
  * path}. Reducing them to a path is the aggregator's job, not the channel's.
@@ -115,21 +118,29 @@ final class ScenarioChannel implements Channel {
   @Override
   public Optional<PlainUri> resolveUri(UriTarget target) {
     return switch (target) {
-      case UriTarget.MediaTarget media ->
-          Optional.of(
-              PlainUri.of("https://example.com/media/" + media.objectId() + "/" + media.mediaId()));
-      case UriTarget.ObjectTarget object -> this.pageUri(object.objectId());
+      case UriTarget.MediaTarget media -> Optional.of(mediaUri(media.objectId(), media.mediaId()));
+      case UriTarget.ObjectTarget object -> this.objectUri(object.objectId());
     };
   }
 
   /**
-   * The page URL of an object, or empty for a standalone medium - that one is published under its
-   * binary and has no page of its own.
+   * The URL of an object: its page, or - for a standalone medium - the download URL of the medium
+   * it publishes.
+   *
+   * <p>A medium still gets no page URL. It has none: it is published under its binary, and the
+   * caller does not have to know that before asking. This mirrors the production channel, whose
+   * object lookup falls back to the article's own binary for exactly this reason.
    */
-  private Optional<PlainUri> pageUri(int objectId) {
-    if (this.repository.isMediaEntry(Integer.toString(objectId))) {
-      return Optional.empty();
+  private Optional<PlainUri> objectUri(int objectId) {
+    String id = Integer.toString(objectId);
+    if (!this.repository.isMediaEntry(id)) {
+      return Optional.of(PlainUri.of("https://example.com/object/" + objectId));
     }
-    return Optional.of(PlainUri.of("https://example.com/object/" + objectId));
+    Integer mediaId = this.repository.mediaIdOfEntry(id);
+    return mediaId == null ? Optional.empty() : Optional.of(mediaUri(objectId, mediaId));
+  }
+
+  private static PlainUri mediaUri(int objectId, int mediaId) {
+    return PlainUri.of("https://example.com/media/" + objectId + "/" + mediaId);
   }
 }

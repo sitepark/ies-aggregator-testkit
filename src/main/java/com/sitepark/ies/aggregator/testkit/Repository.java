@@ -113,6 +113,21 @@ final class Repository {
   }
 
   /**
+   * The asset id of a standalone medium, or {@code null} if the entry is not one or its media block
+   * names no id.
+   *
+   * @param id the entry id
+   */
+  @Nullable Integer mediaIdOfEntry(String id) {
+    Object entry = this.entries.get(id);
+    if (!(entry instanceof Map) || !(asObjectMap(entry).get(MEDIA_KEY) instanceof Map media)) {
+      return null;
+    }
+    Object mediaId = asObjectMap(media).get("id");
+    return mediaId instanceof Number number ? number.intValue() : null;
+  }
+
+  /**
    * Whether the entry counts as published.
    *
    * <p>An entry the scenario declares is published unless it says {@code "published": false}; an id
