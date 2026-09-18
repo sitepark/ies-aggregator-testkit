@@ -46,6 +46,9 @@ final class Repository {
   /** Nested node holding an entry's editable CMS fields, where an upload sits. */
   private static final String CONTENT_KEY = "content";
 
+  /** Entry key that takes an entry out of publication; absent means published. */
+  private static final String PUBLISHED_KEY = "published";
+
   private final Map<String, Object> entries;
   private final Map<String, String> anchors;
 
@@ -107,6 +110,22 @@ final class Repository {
   boolean isMediaEntry(String id) {
     Object entry = this.entries.get(id);
     return entry instanceof Map && asObjectMap(entry).get(MEDIA_KEY) instanceof Map;
+  }
+
+  /**
+   * Whether the entry counts as published.
+   *
+   * <p>An entry the scenario declares is published unless it says {@code "published": false}; an id
+   * the scenario does not declare is not published at all. Production answers this from the
+   * object's publication state, so a scenario has to be able to express an unpublished object —
+   * a barrier switched off, a page not released yet — and an id that stands for nothing must not
+   * come back as published.
+   *
+   * @param id the entry id
+   */
+  boolean isPublishedEntry(String id) {
+    Object entry = this.entries.get(id);
+    return entry instanceof Map && !Boolean.FALSE.equals(asObjectMap(entry).get(PUBLISHED_KEY));
   }
 
   /**

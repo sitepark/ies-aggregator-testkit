@@ -99,9 +99,17 @@ final class ScenarioChannel implements Channel {
     return ResourcePathType.URL;
   }
 
+  /**
+   * Answers from the scenario, not with a blanket yes: an entry the scenario declares is published
+   * unless it carries {@code "published": false}, and an id it does not declare is not published.
+   *
+   * <p>The former constant {@code true} was the more generous answer, and it hid a real defect for
+   * as long as it stood — the IES adapter answered a constant {@code false}, so every caller of
+   * this question got the opposite of the truth in production while every scenario stayed green.
+   */
   @Override
   public boolean isPublished(int objectId) {
-    return true;
+    return this.repository.isPublishedEntry(Integer.toString(objectId));
   }
 
   @Override
