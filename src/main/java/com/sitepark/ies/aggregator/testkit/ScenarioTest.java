@@ -75,7 +75,7 @@ public abstract class ScenarioTest {
 
   // Protected, not package-private as PMD would have it: the subclasses live in the projects that
   // use this harness, so a package-private case would not be inherited there at all.
-  @SuppressWarnings("PMD.JUnit5TestShouldBePackagePrivate")
+  @SuppressWarnings("PMD.JUnitJupiterTestShouldBePackagePrivate")
   @ParameterizedTest(name = "{0}")
   @MethodSource("scenarios")
   protected void producesExpectedOutput(Scenario scenario) {

@@ -163,6 +163,8 @@ class ReflectiveDomainObjectMapperTest {
   }
 
   static final class SimplePojo {
+    // Public on purpose: the mapper only picks up public getters.
+    @SuppressWarnings("PMD.PublicMemberInNonPublicType")
     public Text getName() {
       return PlainText.of("n");
     }
