@@ -1,0 +1,19 @@
+{
+  "enclosingResource": {
+    "init": {
+      "count": 1,
+      "kept": "from an earlier section"
+    },
+    "base": {
+      "title": "Start page"
+    }
+  },
+  "repository": {
+    "1000": {
+      "id": 1000,
+      "content": {
+        "sp_headline": "Counted"
+      }
+    }
+  }
+}

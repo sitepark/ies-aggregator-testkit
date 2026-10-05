@@ -21,6 +21,7 @@ import com.sitepark.ies.aggregator.output.format.JsonWriter;
 import com.sitepark.ies.aggregator.port.AssemblerFactory;
 import com.sitepark.ies.aggregator.port.Channel;
 import com.sitepark.ies.aggregator.port.ChannelProvider;
+import com.sitepark.ies.aggregator.port.ResourceState;
 import com.sitepark.ies.aggregator.resolver.Resolver;
 import com.sitepark.ies.aggregator.resolver.ResolverPath;
 import com.sitepark.ies.aggregator.resolver.RootResolverFactory;
@@ -33,6 +34,7 @@ import java.io.UncheckedIOException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
@@ -99,6 +101,15 @@ public final class ScenarioContext {
   public static final String VARIANT_CONFIG_KEY = "variantConfig";
 
   /**
+   * Top-level key in a scenario file carrying what the template has built of the resource before
+   * the section under test: a map {@code area -> fields}, e.g. {@code {"init": {"characteristics":
+   * {...}}}}. It is what {@link ResourceState#enclosing()} answers while {@link
+   * #aggregateAsSection} plays the tag, and what the section's writes are merged into, flat per
+   * area, as the tag merges them. An absent block means an enclosing resource without any area.
+   */
+  public static final String ENCLOSING_RESOURCE_KEY = "enclosingResource";
+
+  /**
    * Top-level key in a scenario file carrying what the channel says about itself: {@code {"nature":
    * "intranet", "attributes": {"name": "value"}}}. An absent block means a channel that declares
    * neither — the same answer a publisher with nothing configured gives.
@@ -124,6 +135,14 @@ public final class ScenarioContext {
   private final ChannelProvider channelProvider;
   private final ObjectMapper jsonMapper;
   private final @Nullable Object rawOptions;
+  private final ScenarioResourceState resourceState;
+
+  /**
+   * The resource as the template holds it between two sections - the scenario's {@link
+   * #ENCLOSING_RESOURCE_KEY}, then everything {@link #aggregateAsSection} merged into it, so several
+   * sections aggregated on one context see each other as they do on one page.
+   */
+  private final Map<String, Object> enclosingResource;
 
   private ScenarioContext(
       Repository repository,
@@ -132,7 +151,9 @@ public final class ScenarioContext {
       RootResolverFactory rootResolverFactory,
       ChannelProvider channelProvider,
       ObjectMapper jsonMapper,
-      @Nullable Object rawOptions) {
+      @Nullable Object rawOptions,
+      ScenarioResourceState resourceState,
+      Map<String, Object> enclosingResource) {
     this.repository = repository;
     this.layout = layout;
     this.injector = injector;
@@ -141,6 +162,8 @@ public final class ScenarioContext {
     this.channelProvider = channelProvider;
     this.jsonMapper = jsonMapper;
     this.rawOptions = rawOptions;
+    this.resourceState = resourceState;
+    this.enclosingResource = enclosingResource;
   }
 
   /**
@@ -198,6 +221,7 @@ public final class ScenarioContext {
         };
 
     RootResolverFactory rootResolverFactory = new ScenarioRootResolverFactory(repository);
+    ScenarioResourceState resourceState = new ScenarioResourceState();
     ChannelProvider channelProvider =
         new ScenarioChannelProvider(
             repository, accessRestriction(mapper, raw), channelConfig(mapper, raw));
@@ -212,10 +236,19 @@ public final class ScenarioContext {
                 channelProvider,
                 new ScenarioVariantConfigProvider(mapper, raw.get(VARIANT_CONFIG_KEY)),
                 rootResolverFactory,
-                new ScenarioObjectTypeConfigProvider(mapper, raw.get(OBJECT_TYPE_KEY))));
+                new ScenarioObjectTypeConfigProvider(mapper, raw.get(OBJECT_TYPE_KEY)),
+                resourceState));
 
     return new ScenarioContext(
-        repository, layout, injector, rootResolverFactory, channelProvider, mapper, rawOptions);
+        repository,
+        layout,
+        injector,
+        rootResolverFactory,
+        channelProvider,
+        mapper,
+        rawOptions,
+        resourceState,
+        enclosingResource(mapper, raw));
   }
 
   /**
@@ -225,6 +258,17 @@ public final class ScenarioContext {
       ObjectMapper mapper, Map<String, Object> raw) {
     Object access = raw.get(ACCESS_KEY);
     return access == null ? null : mapper.convertValue(access, AccessRestriction.class);
+  }
+
+  /** Reads the resource the template built before the section; absent means no area at all. */
+  private static Map<String, Object> enclosingResource(
+      ObjectMapper mapper, Map<String, Object> raw) {
+    Object enclosing = raw.get(ENCLOSING_RESOURCE_KEY);
+    Map<String, Object> resource = new LinkedHashMap<>();
+    if (enclosing != null) {
+      resource.putAll(mapper.convertValue(enclosing, new TypeReference<Map<String, Object>>() {}));
+    }
+    return resource;
   }
 
   /**
@@ -418,7 +462,12 @@ public final class ScenarioContext {
     // writes beside its own output lands next to it and can be lifted onto the resource.
     OutputObject tagRoot = new OutputObject(null, null);
     OutputObject aggregated = tagRoot.node(this.layout.contentArea());
-    aggregator.aggregate(this.resolver(SOURCE_ID), aggregated);
+    this.resourceState.enterTag(this.enclosingResource);
+    try {
+      aggregator.aggregate(this.resolver(SOURCE_ID), aggregated);
+    } finally {
+      this.resourceState.exitTag();
+    }
 
     boolean reachesThePage = !aggregated.entries().isEmpty();
 
@@ -436,7 +485,50 @@ public final class ScenarioContext {
       container.addComponent(section);
     }
 
-    return toJson(root);
+    return pretty(this.mergeIntoEnclosing(this.parse(toJson(root))));
+  }
+
+  /**
+   * Merges the areas a section wrote into the resource the template holds, the way {@code
+   * AggregatorTag.mergeAreas} does it: flat per area, a key the section wrote replaces the one
+   * already there, the rest of the area stays. The content area is the section's own and is not
+   * carried over.
+   *
+   * @return the resource as the page would hold it after this section
+   */
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> mergeIntoEnclosing(Map<String, Object> written) {
+    Map<String, Object> resource = new LinkedHashMap<>(written);
+    for (Map.Entry<String, Object> entry : written.entrySet()) {
+      if (this.layout.contentArea().equals(entry.getKey())
+          || !(entry.getValue() instanceof Map<?, ?> area)) {
+        continue;
+      }
+      if (this.enclosingResource.get(entry.getKey()) instanceof Map<?, ?> target) {
+        ((Map<String, Object>) target).putAll((Map<String, Object>) area);
+      } else {
+        this.enclosingResource.put(entry.getKey(), mutableCopy((Map<String, Object>) area));
+      }
+    }
+    for (Map.Entry<String, Object> entry : this.enclosingResource.entrySet()) {
+      if (!this.layout.contentArea().equals(entry.getKey())) {
+        resource.put(entry.getKey(), entry.getValue());
+      }
+    }
+    return resource;
+  }
+
+  /** An area the template did not hold yet; later sections merge into it, so it must be mutable. */
+  private static Map<String, Object> mutableCopy(Map<String, Object> area) {
+    return new LinkedHashMap<>(area);
+  }
+
+  private Map<String, Object> parse(String json) {
+    try {
+      return this.jsonMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+    } catch (IOException e) {
+      throw new UncheckedIOException("Cannot parse JSON: " + json, e);
+    }
   }
 
   /**

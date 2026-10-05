@@ -46,7 +46,8 @@ class ChainAssemblerFactoryTest {
                 channelProvider(),
                 mock(VariantConfigProvider.class),
                 mock(RootResolverFactory.class),
-                mock(ObjectTypeConfigProvider.class)))
+                mock(ObjectTypeConfigProvider.class),
+                new ScenarioResourceState()))
         .getInstance(AssemblerFactory.class);
   }
 
