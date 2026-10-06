@@ -266,6 +266,19 @@ final class Repository {
     return Resolver.empty();
   }
 
+  /**
+   * Tells whether a raw field value points at an entry of this repository - an id that exists, or
+   * an id reference ({@code $ref}) to one - which is what makes it a link target.
+   */
+  boolean namesAnEntry(@Nullable Object value) {
+    if (value instanceof String id) {
+      return this.entries.get(id) instanceof Map;
+    }
+    return value instanceof Map<?, ?> node
+        && node.get("$ref") instanceof String refId
+        && this.entries.get(refId) instanceof Map;
+  }
+
   /** Loads the referenced entry and lays the remaining keys of {@code overrides} on top. */
   private Map<String, Object> overlay(String refId, Map<String, Object> overrides) {
     Map<String, Object> merged = new LinkedHashMap<>();

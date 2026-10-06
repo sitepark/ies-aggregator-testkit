@@ -187,12 +187,22 @@ final class RepositoryResolver implements GroupResolver {
    * reference or wrapped under a {@code "link"} key ({@code {"link": "4711"}}); {@code resolveLink}
    * unwraps that {@code link} shape implicitly, whereas {@link #resolve(String)} stays on the
    * wrapper node.
+   *
+   * <p>Only a target that names an entry is followed - an id, or an id reference with overrides
+   * ({@code $ref}). Anything else answers empty, as production does: {@code
+   * BaseInformationVOResolver.resolveLink} follows a field only when it carries a link id whose
+   * article loads. An inline object is not a link; followed anyway, it would hand a port that
+   * reads the link from the wrong level a plausible entity with id {@code 0} here and none in
+   * production.
    */
   @Override
   public EntityResolver resolveLink(String key) {
     Object value = this.field(key);
     if (value instanceof Map<?, ?> map && map.get("link") != null) {
       value = map.get("link");
+    }
+    if (!this.repository.namesAnEntry(value)) {
+      return EntityResolver.empty(this.resolverPath);
     }
     final Object target = value;
     Resolver resolver =
