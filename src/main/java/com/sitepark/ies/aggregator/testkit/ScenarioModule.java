@@ -12,6 +12,7 @@ import com.sitepark.ies.aggregator.port.ChannelProvider;
 import com.sitepark.ies.aggregator.port.ImageScaler;
 import com.sitepark.ies.aggregator.port.MediaProvider;
 import com.sitepark.ies.aggregator.port.ObjectTypeConfigProvider;
+import com.sitepark.ies.aggregator.port.PublishedLinks;
 import com.sitepark.ies.aggregator.port.ResourceState;
 import com.sitepark.ies.aggregator.port.VariantConfigProvider;
 import com.sitepark.ies.aggregator.resolver.RootResolverFactory;
@@ -59,6 +60,7 @@ final class ScenarioModule implements Module {
   private final RootResolverFactory rootResolverFactory;
   private final ObjectTypeConfigProvider objectTypeConfigProvider;
   private final ResourceState resourceState;
+  private final PublishedLinks publishedLinks;
 
   ScenarioModule(
       AssemblerPackages assemblerPackages,
@@ -68,7 +70,8 @@ final class ScenarioModule implements Module {
       VariantConfigProvider variantConfigProvider,
       RootResolverFactory rootResolverFactory,
       ObjectTypeConfigProvider objectTypeConfigProvider,
-      ResourceState resourceState) {
+      ResourceState resourceState,
+      PublishedLinks publishedLinks) {
     this.assemblerPackages = assemblerPackages;
     this.mediaProvider = mediaProvider;
     this.parser = parser;
@@ -77,6 +80,7 @@ final class ScenarioModule implements Module {
     this.rootResolverFactory = rootResolverFactory;
     this.objectTypeConfigProvider = objectTypeConfigProvider;
     this.resourceState = resourceState;
+    this.publishedLinks = publishedLinks;
   }
 
   @Override
@@ -94,6 +98,7 @@ final class ScenarioModule implements Module {
     binder.bind(RootResolverFactory.class).toInstance(this.rootResolverFactory);
     binder.bind(ObjectTypeConfigProvider.class).toInstance(this.objectTypeConfigProvider);
     binder.bind(ResourceState.class).toInstance(this.resourceState);
+    binder.bind(PublishedLinks.class).toInstance(this.publishedLinks);
     binder.bind(DomainObjectMapper.class).to(ReflectiveDomainObjectMapper.class);
 
     binder.bind(ImageScaler.class).toInstance(new ScenarioImageScaler());

@@ -136,6 +136,7 @@ public final class ScenarioContext {
   private final ObjectMapper jsonMapper;
   private final @Nullable Object rawOptions;
   private final ScenarioResourceState resourceState;
+  private final ScenarioPublishedLinks publishedLinks;
 
   /**
    * The resource as the template holds it between two sections - the scenario's {@link
@@ -153,6 +154,7 @@ public final class ScenarioContext {
       ObjectMapper jsonMapper,
       @Nullable Object rawOptions,
       ScenarioResourceState resourceState,
+      ScenarioPublishedLinks publishedLinks,
       Map<String, Object> enclosingResource) {
     this.repository = repository;
     this.layout = layout;
@@ -163,6 +165,7 @@ public final class ScenarioContext {
     this.jsonMapper = jsonMapper;
     this.rawOptions = rawOptions;
     this.resourceState = resourceState;
+    this.publishedLinks = publishedLinks;
     this.enclosingResource = enclosingResource;
   }
 
@@ -222,6 +225,7 @@ public final class ScenarioContext {
 
     RootResolverFactory rootResolverFactory = new ScenarioRootResolverFactory(repository);
     ScenarioResourceState resourceState = new ScenarioResourceState();
+    ScenarioPublishedLinks publishedLinks = new ScenarioPublishedLinks();
     ChannelProvider channelProvider =
         new ScenarioChannelProvider(
             repository, accessRestriction(mapper, raw), channelConfig(mapper, raw));
@@ -237,7 +241,8 @@ public final class ScenarioContext {
                 new ScenarioVariantConfigProvider(mapper, raw.get(VARIANT_CONFIG_KEY)),
                 rootResolverFactory,
                 new ScenarioObjectTypeConfigProvider(mapper, raw.get(OBJECT_TYPE_KEY)),
-                resourceState));
+                resourceState,
+                publishedLinks));
 
     return new ScenarioContext(
         repository,
@@ -248,6 +253,7 @@ public final class ScenarioContext {
         mapper,
         rawOptions,
         resourceState,
+        publishedLinks,
         enclosingResource(mapper, raw));
   }
 
@@ -582,6 +588,17 @@ public final class ScenarioContext {
     OutputObject root = new OutputObject(null, null);
     aggregator.aggregate(this.embeddedMedia(mediaId), root);
     return toJson(root);
+  }
+
+  /**
+   * The external links the aggregations of this context reported to the publisher, in the order
+   * they were reported.
+   *
+   * <p>The publisher keeps them beside the resource, not in it, so no expectation file shows them;
+   * a test asks here instead.
+   */
+  public List<PublishedLink> publishedLinks() {
+    return this.publishedLinks.reported();
   }
 
   /**
