@@ -51,8 +51,10 @@ class ObjectTypeAssemblerFactoryTest {
                 mock(VariantConfigProvider.class),
                 mock(RootResolverFactory.class),
                 mock(ObjectTypeConfigProvider.class),
-                new ScenarioResourceState(),
-                new ScenarioPublishedLinks()))
+                new PublisherPorts(
+                    new ScenarioResourceState(),
+                    new ScenarioPublishedLinks(),
+                    new ScenarioRegeneration(ScenarioModule.FIXED_CLOCK))))
         .getInstance(AssemblerFactory.class);
   }
 

@@ -33,10 +33,12 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -137,6 +139,7 @@ public final class ScenarioContext {
   private final @Nullable Object rawOptions;
   private final ScenarioResourceState resourceState;
   private final ScenarioPublishedLinks publishedLinks;
+  private final ScenarioRegeneration regeneration;
 
   /**
    * The resource as the template holds it between two sections - the scenario's {@link
@@ -155,6 +158,7 @@ public final class ScenarioContext {
       @Nullable Object rawOptions,
       ScenarioResourceState resourceState,
       ScenarioPublishedLinks publishedLinks,
+      ScenarioRegeneration regeneration,
       Map<String, Object> enclosingResource) {
     this.repository = repository;
     this.layout = layout;
@@ -166,6 +170,7 @@ public final class ScenarioContext {
     this.rawOptions = rawOptions;
     this.resourceState = resourceState;
     this.publishedLinks = publishedLinks;
+    this.regeneration = regeneration;
     this.enclosingResource = enclosingResource;
   }
 
@@ -226,6 +231,7 @@ public final class ScenarioContext {
     RootResolverFactory rootResolverFactory = new ScenarioRootResolverFactory(repository);
     ScenarioResourceState resourceState = new ScenarioResourceState();
     ScenarioPublishedLinks publishedLinks = new ScenarioPublishedLinks();
+    ScenarioRegeneration regeneration = new ScenarioRegeneration(ScenarioModule.FIXED_CLOCK);
     ChannelProvider channelProvider =
         new ScenarioChannelProvider(
             repository, accessRestriction(mapper, raw), channelConfig(mapper, raw));
@@ -241,8 +247,7 @@ public final class ScenarioContext {
                 new ScenarioVariantConfigProvider(mapper, raw.get(VARIANT_CONFIG_KEY)),
                 rootResolverFactory,
                 new ScenarioObjectTypeConfigProvider(mapper, raw.get(OBJECT_TYPE_KEY)),
-                resourceState,
-                publishedLinks));
+                new PublisherPorts(resourceState, publishedLinks, regeneration)));
 
     return new ScenarioContext(
         repository,
@@ -254,6 +259,7 @@ public final class ScenarioContext {
         rawOptions,
         resourceState,
         publishedLinks,
+        regeneration,
         enclosingResource(mapper, raw));
   }
 
@@ -599,6 +605,19 @@ public final class ScenarioContext {
    */
   public List<PublishedLink> publishedLinks() {
     return this.publishedLinks.reported();
+  }
+
+  /**
+   * When the aggregations of this context asked for the resource to be generated again - the
+   * earliest future moment any of them named, as the publisher would store it.
+   *
+   * <p>Like the published links this lives beside the resource, not in it; "now" is the harness's
+   * frozen clock.
+   *
+   * @return the moment, or empty if no aggregation asked for one
+   */
+  public Optional<Instant> regeneration() {
+    return this.regeneration.moment();
   }
 
   /**

@@ -16,6 +16,7 @@ final class ScenarioChannelProvider implements ChannelProvider {
 
   private final ScenarioChannel currentChannel;
   private final ScenarioChannel primaryChannel;
+  private final boolean hasPrimaryChannel;
 
   /**
    * @param repository the scenario's repository, which tells the channels which objects are
@@ -29,14 +30,20 @@ final class ScenarioChannelProvider implements ChannelProvider {
       @Nullable AccessRestriction accessRestriction,
       ScenarioChannelConfig config) {
     this.currentChannel =
-        new ScenarioChannel(1, "Current Channel", accessRestriction, repository, config);
+        new ScenarioChannel(1, true, "Current Channel", accessRestriction, repository, config);
     this.primaryChannel =
-        new ScenarioChannel(2, "Primary Channel", accessRestriction, repository, config);
+        new ScenarioChannel(2, false, "Primary Channel", accessRestriction, repository, config);
+    this.hasPrimaryChannel = config.primaryChannel();
   }
 
+  /**
+   * The primary channel only where the scenario declares one ({@code "primaryChannel": true}).
+   * Production answers empty for an object no pool assigns a primary channel, and that is the usual
+   * case; answering one regardless would let a fallback through that production never takes.
+   */
   @Override
   public Optional<Channel> primary(int id) {
-    return Optional.of(this.primaryChannel);
+    return this.hasPrimaryChannel ? Optional.of(this.primaryChannel) : Optional.empty();
   }
 
   @Override

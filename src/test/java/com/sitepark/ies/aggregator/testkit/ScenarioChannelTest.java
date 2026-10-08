@@ -3,6 +3,7 @@ package com.sitepark.ies.aggregator.testkit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sitepark.ies.aggregator.port.Channel;
+import com.sitepark.ies.aggregator.port.UrlLookup;
 import com.sitepark.ies.aggregator.value.uri.UriTarget;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -39,7 +40,7 @@ class ScenarioChannelTest {
             "a standalone medium has no page of its own, so an object target answers with the"
                 + " download URL of the medium it publishes - the caller must not have to know"
                 + " what kind of object it is pointing at")
-        .contains("https://example.com/media/1000/4712");
+        .contains("/media/1000/4712");
   }
 
   @Test
@@ -57,7 +58,7 @@ class ScenarioChannelTest {
 
     assertThat(channel.resolveUri(UriTarget.ofObject(1000)).map(Object::toString))
         .as("an ordinary resource resolves to the page URL of its object id")
-        .contains("https://example.com/object/1000");
+        .contains("/object/1000");
   }
 
   @Test
@@ -80,7 +81,7 @@ class ScenarioChannelTest {
 
     assertThat(channel.resolveUri(UriTarget.ofMedia(1000, 4712)).map(Object::toString))
         .as("only the binary target resolves for a medium")
-        .contains("https://example.com/media/1000/4712");
+        .contains("/media/1000/4712");
   }
 
   @Test
@@ -95,7 +96,9 @@ class ScenarioChannelTest {
   @Test
   void answersTheNatureTheScenarioNames() {
     Channel channel =
-        channel(Map.of("1000", Map.of("id", 1000)), ScenarioChannelConfig.of("intranet", Map.of()));
+        channel(
+            Map.of("1000", Map.of("id", 1000)),
+            ScenarioChannelConfig.of("intranet", Map.of(), null, null));
 
     assertThat(channel.nature())
         .as("a rule keyed to an internal web has to be shown the scenario that declares one")
@@ -107,7 +110,7 @@ class ScenarioChannelTest {
     Channel channel =
         channel(
             Map.of("1000", Map.of("id", 1000)),
-            ScenarioChannelConfig.of(null, Map.of("sp_vv_mode", "intern")));
+            ScenarioChannelConfig.of(null, Map.of("sp_vv_mode", "intern"), null, null));
 
     assertThat(channel.attribute("sp_vv_mode"))
         .as("the attribute the scenario sets is answered verbatim")
@@ -130,13 +133,50 @@ class ScenarioChannelTest {
   }
 
   @Test
-  void answersWithAnAbsoluteUrl() {
-    Channel channel = channel(Map.of("1000", Map.of("id", 1000)));
+  void answersTheUrlLookupOnlyWhereTheScenarioNamesOne() {
+    Map<String, Object> repository = Map.of("1000", Map.of("id", 1000));
 
-    assertThat(channel.resolveUri(UriTarget.ofObject(1000)).map(uri -> uri.scheme()))
-        .as(
-            "the production channel hands out baseUrl plus path; reducing it is the aggregator's"
-                + " job")
-        .contains("https");
+    assertThat(channel(repository, ScenarioChannelConfig.EMPTY).urlLookup())
+        .as("a nature without urlLookup links no object it does not publish")
+        .isEmpty();
+    assertThat(
+            channel(repository, ScenarioChannelConfig.of(null, Map.of(), UrlLookup.STRICT, null))
+                .urlLookup())
+        .contains(UrlLookup.STRICT);
+  }
+
+  @Test
+  void answersAPrimaryChannelOnlyWhereTheScenarioDeclaresOne() {
+    Repository repository = new Repository(Map.of("1000", Map.of("id", 1000)));
+
+    assertThat(
+            new ScenarioChannelProvider(repository, null, ScenarioChannelConfig.EMPTY)
+                .primary(1000))
+        .as("production answers empty for an object no pool assigns a primary channel")
+        .isEmpty();
+    assertThat(
+            new ScenarioChannelProvider(
+                    repository, null, ScenarioChannelConfig.of(null, Map.of(), null, true))
+                .primary(1000))
+        .isPresent();
+  }
+
+  @Test
+  void answersAPathInTheCurrentChannelAndTheFullUrlInAnother() {
+    Repository repository = new Repository(Map.of("1000", Map.of("id", 1000)));
+    ScenarioChannelProvider provider =
+        new ScenarioChannelProvider(
+            repository, null, ScenarioChannelConfig.of(null, Map.of(), null, true));
+
+    assertThat(provider.current().resolveUri(UriTarget.ofObject(1000)).map(Object::toString))
+        .as("a page of the current site links to the target by its path")
+        .contains("/object/1000");
+    assertThat(
+            provider
+                .primary(1000)
+                .flatMap(channel -> channel.resolveUri(UriTarget.ofObject(1000)))
+                .map(Object::toString))
+        .as("another channel keeps its host, or the link would point into the current site")
+        .contains("https://example.com/object/1000");
   }
 }

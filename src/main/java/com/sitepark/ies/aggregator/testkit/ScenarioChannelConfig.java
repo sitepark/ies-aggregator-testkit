@@ -2,6 +2,7 @@ package com.sitepark.ies.aggregator.testkit;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.sitepark.ies.aggregator.port.UrlLookup;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
@@ -16,11 +17,19 @@ import org.jspecify.annotations.Nullable;
  *
  * @param nature the channel's nature, or {@code null} if the scenario names none
  * @param attributes the configured attributes, empty if the scenario names none
+ * @param urlLookup the {@code urlLookup} of the channel's nature, or {@code null} if it configures
+ *     none
+ * @param primaryChannel whether objects have a primary channel besides this one; without it {@code
+ *     ChannelProvider.primary} answers empty, as for an object no pool assigns one
  */
-record ScenarioChannelConfig(@Nullable String nature, Map<String, String> attributes) {
+record ScenarioChannelConfig(
+    @Nullable String nature,
+    Map<String, String> attributes,
+    @Nullable UrlLookup urlLookup,
+    boolean primaryChannel) {
 
   /** A channel that declares neither a nature nor a single attribute. */
-  static final ScenarioChannelConfig EMPTY = new ScenarioChannelConfig(null, Map.of());
+  static final ScenarioChannelConfig EMPTY = new ScenarioChannelConfig(null, Map.of(), null, false);
 
   ScenarioChannelConfig {
     attributes = Map.copyOf(attributes);
@@ -30,7 +39,13 @@ record ScenarioChannelConfig(@Nullable String nature, Map<String, String> attrib
   @JsonCreator
   static ScenarioChannelConfig of(
       @JsonProperty("nature") @Nullable String nature,
-      @JsonProperty("attributes") @Nullable Map<String, String> attributes) {
-    return new ScenarioChannelConfig(nature, attributes == null ? Map.of() : attributes);
+      @JsonProperty("attributes") @Nullable Map<String, String> attributes,
+      @JsonProperty("urlLookup") @Nullable UrlLookup urlLookup,
+      @JsonProperty("primaryChannel") @Nullable Boolean primaryChannel) {
+    return new ScenarioChannelConfig(
+        nature,
+        attributes == null ? Map.of() : attributes,
+        urlLookup,
+        Boolean.TRUE.equals(primaryChannel));
   }
 }

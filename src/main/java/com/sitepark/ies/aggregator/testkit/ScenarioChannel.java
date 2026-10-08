@@ -1,6 +1,7 @@
 package com.sitepark.ies.aggregator.testkit;
 
 import com.sitepark.ies.aggregator.port.Channel;
+import com.sitepark.ies.aggregator.port.UrlLookup;
 import com.sitepark.ies.aggregator.value.AccessRestriction;
 import com.sitepark.ies.aggregator.value.ResourcePathType;
 import com.sitepark.ies.aggregator.value.uri.PlainUri;
@@ -25,8 +26,8 @@ import org.jspecify.annotations.Nullable;
  * a medium, which was right about the page URL and wrong about the link - production dropped the
  * whole link, and no scenario could show it.
  *
- * <p>The URLs are absolute, again like the production channel, which hands out {@code baseUrl +
- * path}. Reducing them to a path is the aggregator's job, not the channel's.
+ * <p>As in production, the current channel answers a path and any other channel the full URL with
+ * its host, so a link into another channel keeps pointing at that channel's site.
  */
 final class ScenarioChannel implements Channel {
 
@@ -35,9 +36,11 @@ final class ScenarioChannel implements Channel {
   private final @Nullable AccessRestriction accessRestriction;
   private final Repository repository;
   private final ScenarioChannelConfig config;
+  private final boolean current;
 
   ScenarioChannel(
       int id,
+      boolean current,
       String name,
       @Nullable AccessRestriction accessRestriction,
       Repository repository,
@@ -47,6 +50,7 @@ final class ScenarioChannel implements Channel {
     this.accessRestriction = accessRestriction;
     this.repository = repository;
     this.config = config;
+    this.current = current;
   }
 
   @Override
@@ -85,6 +89,12 @@ final class ScenarioChannel implements Channel {
     return Optional.ofNullable(this.config.nature());
   }
 
+  /** The {@code urlLookup} the scenario's {@code channel} block names; empty when it names none. */
+  @Override
+  public Optional<UrlLookup> urlLookup() {
+    return Optional.ofNullable(this.config.urlLookup());
+  }
+
   /** The attributes the scenario's {@code channel} block names; every other name stays empty. */
   @Override
   public Optional<String> attribute(String name) {
@@ -117,10 +127,13 @@ final class ScenarioChannel implements Channel {
 
   @Override
   public Optional<PlainUri> resolveUri(UriTarget target) {
-    return switch (target) {
-      case UriTarget.MediaTarget media -> Optional.of(mediaUri(media.objectId(), media.mediaId()));
-      case UriTarget.ObjectTarget object -> this.objectUri(object.objectId());
-    };
+    Optional<PlainUri> uri =
+        switch (target) {
+          case UriTarget.MediaTarget media ->
+              Optional.of(mediaUri(media.objectId(), media.mediaId()));
+          case UriTarget.ObjectTarget object -> this.objectUri(object.objectId());
+        };
+    return this.current ? uri.map(PlainUri::toAbsolutePathReference) : uri;
   }
 
   /**

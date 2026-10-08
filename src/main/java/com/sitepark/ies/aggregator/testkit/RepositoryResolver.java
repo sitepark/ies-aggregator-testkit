@@ -1,5 +1,6 @@
 package com.sitepark.ies.aggregator.testkit;
 
+import com.sitepark.ies.aggregator.resolver.EntityKind;
 import com.sitepark.ies.aggregator.resolver.EntityResolver;
 import com.sitepark.ies.aggregator.resolver.GroupDescriptor;
 import com.sitepark.ies.aggregator.resolver.GroupResolver;
@@ -86,13 +87,19 @@ final class RepositoryResolver implements GroupResolver {
    * unproven either way and are therefore left out.
    */
   private static final Set<String> MASTER_DATA_KEYS =
-      Set.of("created", "changed", "createdBy", "changedBy", "id");
+      Set.of("created", "changed", "createdBy", "changedBy", "id", "entityKind");
 
   /** Structural block holding the entry's group data. */
   private static final String GROUP_KEY = "group";
 
   /** Structural block holding the entry's media asset. */
   private static final String MEDIA_KEY = "media";
+
+  /**
+   * Master data naming an entry a resource article ({@code "entityKind": "resource"}) - the one kind
+   * nothing else in an entry tells apart from a page.
+   */
+  private static final String ENTITY_KIND_KEY = "entityKind";
 
   /** Field a scenario spells out a section's own, reordering-stable id under. */
   private static final String UUID_KEY = "uuid";
@@ -453,6 +460,24 @@ final class RepositoryResolver implements GroupResolver {
     @Override
     public boolean isMedia() {
       return RepositoryResolver.this.node.get(MEDIA_KEY) instanceof Map;
+    }
+
+    /**
+     * A medium by its {@code media} block, a group by its {@code group} block, a resource article only
+     * where the entry says {@code "entityKind": "resource"} - everything else is a page, the kind
+     * nearly every article is. The production adapter reads the kind from the article's class.
+     */
+    @Override
+    public EntityKind kind() {
+      if (this.isMedia()) {
+        return EntityKind.MEDIA;
+      }
+      if (RepositoryResolver.this.node.get(GROUP_KEY) instanceof Map) {
+        return EntityKind.GROUP;
+      }
+      return "resource".equals(RepositoryResolver.this.node.get(ENTITY_KIND_KEY))
+          ? EntityKind.RESOURCE
+          : EntityKind.PAGE;
     }
 
     @Override
