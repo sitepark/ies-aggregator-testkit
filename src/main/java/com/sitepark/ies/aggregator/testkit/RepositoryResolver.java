@@ -101,6 +101,9 @@ final class RepositoryResolver implements GroupResolver {
    */
   private static final String ENTITY_KIND_KEY = "entityKind";
 
+  /** The key a link field wraps its target under ({@code {"link": "4711"}}). */
+  private static final String LINK_KEY = "link";
+
   /** Field a scenario spells out a section's own, reordering-stable id under. */
   private static final String UUID_KEY = "uuid";
 
@@ -205,8 +208,8 @@ final class RepositoryResolver implements GroupResolver {
   @Override
   public EntityResolver resolveLink(String key) {
     Object value = this.field(key);
-    if (value instanceof Map<?, ?> map && map.get("link") != null) {
-      value = map.get("link");
+    if (value instanceof Map<?, ?> map && map.get(LINK_KEY) != null) {
+      value = map.get(LINK_KEY);
     }
     if (!this.repository.namesAnEntry(value)) {
       return EntityResolver.empty(this.resolverPath);
@@ -218,6 +221,39 @@ final class RepositoryResolver implements GroupResolver {
     return resolver instanceof EntityResolver entity
         ? entity
         : EntityResolver.empty(resolver.path());
+  }
+
+  /**
+   * Follows every link of a field that holds several. Production keeps them as the link list of one
+   * field, so a scenario writes them as a list under the {@code "link"} key ({@code {"link":
+   * ["4711", "4712"]}}) or as a bare list of ids; a single link is a list of one.
+   *
+   * <p>Each element is followed under the same rule as {@link #resolveLink(String)}: only a target
+   * that names an entry, anything else is left out - as {@code BaseInformationVOResolver} leaves out
+   * a link whose article does not load. Each linked entity gets the key {@code resolveLink} hands
+   * down, because production starts a new scope at every linked article without an index.
+   */
+  @Override
+  public List<EntityResolver> resolveLinks(String key) {
+    Object value = this.field(key);
+    if (value instanceof Map<?, ?> map && map.get(LINK_KEY) != null) {
+      value = map.get(LINK_KEY);
+    }
+    List<?> targets =
+        value instanceof List<?> list ? list : value == null ? List.of() : List.of(value);
+    List<EntityResolver> linked = new ArrayList<>();
+    for (Object target : targets) {
+      if (!this.repository.namesAnEntry(target)) {
+        continue;
+      }
+      Resolver resolver =
+          this.resolverPath.descend(
+              key, (path) -> this.repository.toResolver(path, target, this.keyOfChild(key)));
+      if (resolver instanceof EntityResolver entity && !entity.isEmpty()) {
+        linked.add(entity);
+      }
+    }
+    return List.copyOf(linked);
   }
 
   /**
