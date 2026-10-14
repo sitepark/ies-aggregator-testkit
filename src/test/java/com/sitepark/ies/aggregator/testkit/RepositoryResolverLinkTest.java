@@ -3,6 +3,7 @@ package com.sitepark.ies.aggregator.testkit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sitepark.ies.aggregator.resolver.EntityResolver;
+import com.sitepark.ies.aggregator.resolver.GroupResolver;
 import com.sitepark.ies.aggregator.resolver.Resolver;
 import com.sitepark.ies.aggregator.resolver.ResolverPath;
 import java.util.List;
@@ -106,5 +107,51 @@ class RepositoryResolverLinkTest {
     Repository repository = new Repository(Map.of("1", Map.of("id", "1", "content", Map.of())));
     Resolver page = ResolverPath.createRoot(path -> repository.resolver(path, "1"));
     assertThat(page.resolveLinks("sp_categoryRoots")).isEmpty();
+  }
+
+  private static Resolver pageLinking(Object field) {
+    Repository repository =
+        new Repository(
+            Map.of(
+                "1",
+                Map.of("id", "1", "content", Map.of("sp_galleryGroup", field)),
+                "2",
+                TARGET,
+                "7",
+                Map.of("id", "7", "group", Map.of("entities", List.of("2")))));
+    return ResolverPath.createRoot(path -> repository.resolver(path, "1"));
+  }
+
+  @Test
+  void resolveLinkDoesNotFollowAGroup() {
+    assertThat(pageLinking("7").resolveLink("sp_galleryGroup").isEmpty())
+        .as("production loads the target as an article and answers none for a pool")
+        .isTrue();
+  }
+
+  @Test
+  void resolveLinksLeavesOutAGroup() {
+    assertThat(pageLinking(List.of("7", "2")).resolveLinks("sp_galleryGroup"))
+        .as("only the entity, not the group")
+        .hasSize(1);
+  }
+
+  @Test
+  void resolveGroupLinkFollowsAGroup() {
+    GroupResolver group = pageLinking(Map.of("link", "7")).resolveGroupLink("sp_galleryGroup");
+    assertThat(group.isEmpty()).as("the linked group").isFalse();
+    assertThat(group.entities()).as("its members").hasSize(1);
+  }
+
+  @Test
+  void resolveGroupLinkDoesNotFollowAnEntity() {
+    assertThat(pageLinking("2").resolveGroupLink("sp_galleryGroup").isEmpty())
+        .as("an entity is no group link target")
+        .isTrue();
+  }
+
+  @Test
+  void resolveGroupLinkAnswersNothingForAnUnknownId() {
+    assertThat(pageLinking("4711").resolveGroupLink("sp_galleryGroup").isEmpty()).isTrue();
   }
 }

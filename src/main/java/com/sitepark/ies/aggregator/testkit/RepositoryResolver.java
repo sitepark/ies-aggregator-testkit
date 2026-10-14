@@ -203,15 +203,13 @@ final class RepositoryResolver implements GroupResolver {
    * BaseInformationVOResolver.resolveLink} follows a field only when it carries a link id whose
    * article loads. An inline object is not a link; followed anyway, it would hand a port that
    * reads the link from the wrong level a plausible entity with id {@code 0} here and none in
-   * production.
+   * production. A group entry is no link target either: production loads the target as an article
+   * and answers none for a pool; {@link #resolveGroupLink(String)} follows those.
    */
   @Override
   public EntityResolver resolveLink(String key) {
-    Object value = this.field(key);
-    if (value instanceof Map<?, ?> map && map.get(LINK_KEY) != null) {
-      value = map.get(LINK_KEY);
-    }
-    if (!this.repository.namesAnEntry(value)) {
+    Object value = this.linkValue(key);
+    if (!this.repository.namesAnEntity(value)) {
       return EntityResolver.empty(this.resolverPath);
     }
     final Object target = value;
@@ -235,15 +233,12 @@ final class RepositoryResolver implements GroupResolver {
    */
   @Override
   public List<EntityResolver> resolveLinks(String key) {
-    Object value = this.field(key);
-    if (value instanceof Map<?, ?> map && map.get(LINK_KEY) != null) {
-      value = map.get(LINK_KEY);
-    }
+    Object value = this.linkValue(key);
     List<?> targets =
         value instanceof List<?> list ? list : value == null ? List.of() : List.of(value);
     List<EntityResolver> linked = new ArrayList<>();
     for (Object target : targets) {
-      if (!this.repository.namesAnEntry(target)) {
+      if (!this.repository.namesAnEntity(target)) {
         continue;
       }
       Resolver resolver =
@@ -254,6 +249,35 @@ final class RepositoryResolver implements GroupResolver {
       }
     }
     return List.copyOf(linked);
+  }
+
+  /**
+   * Follows a link field that names a group - a scenario writes it like any link, as the id of a
+   * group entry or wrapped under {@code "link"}. Only a group entry is followed, as production
+   * follows the link through its pool loader; anything else answers the empty group.
+   */
+  @Override
+  public GroupResolver resolveGroupLink(String key) {
+    Object value = this.linkValue(key);
+    if (!this.repository.namesAGroup(value)) {
+      return GroupResolver.empty(this.resolverPath);
+    }
+    final Object target = value;
+    Resolver resolver =
+        this.resolverPath.descend(
+            key, (path) -> this.repository.toResolver(path, target, this.keyOfChild(key)));
+    return resolver instanceof GroupResolver group && !group.isEmpty()
+        ? group
+        : GroupResolver.empty(resolver.path());
+  }
+
+  /** The raw value of a link field, unwrapped from its {@code "link"} key if it has one. */
+  private @Nullable Object linkValue(String key) {
+    Object value = this.field(key);
+    if (value instanceof Map<?, ?> map && map.get(LINK_KEY) != null) {
+      return map.get(LINK_KEY);
+    }
+    return value;
   }
 
   /**

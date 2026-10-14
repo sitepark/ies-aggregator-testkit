@@ -271,12 +271,36 @@ final class Repository {
    * an id reference ({@code $ref}) to one - which is what makes it a link target.
    */
   boolean namesAnEntry(@Nullable Object value) {
+    String id = entryId(value);
+    return id != null && this.entries.get(id) instanceof Map;
+  }
+
+  /**
+   * Tells whether a raw field value points at an entry that is no group - what production's
+   * {@code resolveLink} follows: it loads the target as an article and answers none for a pool.
+   */
+  boolean namesAnEntity(@Nullable Object value) {
+    String id = entryId(value);
+    return id != null && this.entries.get(id) instanceof Map && !this.isGroupEntry(id);
+  }
+
+  /**
+   * Tells whether a raw field value points at a group entry - what production's {@code
+   * resolveGroupLink} follows, through its pool loader.
+   */
+  boolean namesAGroup(@Nullable Object value) {
+    String id = entryId(value);
+    return id != null && this.isGroupEntry(id);
+  }
+
+  /** The id a raw field value names: the value itself, or the target of an id reference. */
+  private static @Nullable String entryId(@Nullable Object value) {
     if (value instanceof String id) {
-      return this.entries.get(id) instanceof Map;
+      return id;
     }
-    return value instanceof Map<?, ?> node
-        && node.get("$ref") instanceof String refId
-        && this.entries.get(refId) instanceof Map;
+    return value instanceof Map<?, ?> node && node.get("$ref") instanceof String refId
+        ? refId
+        : null;
   }
 
   /** Loads the referenced entry and lays the remaining keys of {@code overrides} on top. */
