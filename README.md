@@ -134,6 +134,29 @@ The entry `1000` is the source the aggregation starts from (`ScenarioContext.SOU
 Everything concrete — services, resolvers, builders, dispatchers — is reached through just-in-time
 bindings. An assembler with a collaborator of its own needs no change to the harness.
 
+## Ports an aggregator JAR binds itself
+
+A port the platform does not provide is declared and bound by the aggregator JAR: an `Extension`
+with a static `@ConfigureFactory` method adds a Guice module, and a module built on the JAR replaces
+the shipped default through an `OptionalBinder`. The harness installs those modules the way the
+production `ExtensionFactory` does — every `Extension` under the scanned packages — so an assembler
+gets the binding its JAR ships, not one the harness invents.
+
+To stand in for such a port with scenario data, a project declares an extension in its **test**
+sources that replaces the default (`OptionalBinder…setBinding()`) with an implementation of its
+own. That implementation reads its block from the scenario file through the injected
+`ScenarioFixture`:
+
+```java
+@Inject
+ScenarioGreeting(ScenarioFixture fixture) {
+  this.text = fixture.block("greeting", new TypeReference<String>() {}).orElse("");
+}
+```
+
+The block is the project's own; the harness only hands it through. A port the platform provides
+must not be bound this way: Guice refuses the second binding in production as well as here.
+
 Two aggregation paths are offered, and they differ on purpose. `aggregate(ComponentAggregation, type)`
 asks the component aggregation directly and attaches the component if it reports content.
 `aggregateAsSection(Aggregator, type)` drives the aggregator the way the production tag does and

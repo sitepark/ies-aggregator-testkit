@@ -107,6 +107,17 @@
 			<version>4.8.196</version>
 		</dependency>
 
+		<!-- The extension contract an aggregator JAR contributes Guice modules through: the harness
+		     installs those modules the way the production ExtensionFactory does. An ordinary
+		     dependency, not provided, because a project's test classpath must be able to load the
+		     extensions of every JAR it builds on, also when the project declares no extension of its
+		     own. Version as IES pins it. -->
+		<dependency>
+			<groupId>com.sitepark.ies</groupId>
+			<artifactId>ies-extension-api</artifactId>
+			<version>1.1.0</version>
+		</dependency>
+
 		<!-- Constructor injection for the discovered assemblers and their collaborators, the way
 		     the production container does it: the harness binds the ports and lets the injector
 		     build everything else from the @Inject constructors. Version and classifier as IES

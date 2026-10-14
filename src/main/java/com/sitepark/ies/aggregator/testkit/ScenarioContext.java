@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import com.google.inject.Module;
 import com.sitepark.ies.aggregator.Aggregator;
 import com.sitepark.ies.aggregator.Options;
 import com.sitepark.ies.aggregator.OptionsAware;
@@ -34,6 +35,7 @@ import java.io.UncheckedIOException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -236,18 +238,25 @@ public final class ScenarioContext {
         new ScenarioChannelProvider(
             repository, accessRestriction(mapper, raw), channelConfig(mapper, raw));
     // Only the ports are wired by hand; every assembler and every collaborator behind them is built
-    // by the injector from its @Inject constructor, the way the production container does it.
-    Injector injector =
-        Guice.createInjector(
-            new ScenarioModule(
-                new AssemblerPackages(Arrays.asList(assemblerPackages)),
-                new RepositoryMediaProvider(),
-                parser,
-                channelProvider,
-                new ScenarioVariantConfigProvider(mapper, raw.get(VARIANT_CONFIG_KEY)),
-                rootResolverFactory,
-                new ScenarioObjectTypeConfigProvider(mapper, raw.get(OBJECT_TYPE_KEY)),
-                new PublisherPorts(resourceState, publishedLinks, regeneration)));
+    // by the injector from its @Inject constructor, the way the production container does it. Next
+    // to them go the modules the extensions of the scanned packages contribute, as in production,
+    // and the scenario's blocks for the implementations a project's test extension binds.
+    List<String> packages = Arrays.asList(assemblerPackages);
+    ScenarioFixture fixture = new ScenarioFixture(mapper, raw);
+    List<Module> modules = new ArrayList<>();
+    modules.add(
+        new ScenarioModule(
+            new AssemblerPackages(packages),
+            new RepositoryMediaProvider(),
+            parser,
+            channelProvider,
+            new ScenarioVariantConfigProvider(mapper, raw.get(VARIANT_CONFIG_KEY)),
+            rootResolverFactory,
+            new ScenarioObjectTypeConfigProvider(mapper, raw.get(OBJECT_TYPE_KEY)),
+            new PublisherPorts(resourceState, publishedLinks, regeneration)));
+    modules.add(binder -> binder.bind(ScenarioFixture.class).toInstance(fixture));
+    modules.addAll(ExtensionModules.of(packages));
+    Injector injector = Guice.createInjector(modules);
 
     return new ScenarioContext(
         repository,
