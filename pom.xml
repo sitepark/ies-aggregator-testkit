@@ -104,7 +104,7 @@
 		<dependency>
 			<groupId>io.github.classgraph</groupId>
 			<artifactId>classgraph</artifactId>
-			<version>4.8.196</version>
+			<version>6.0.0</version>
 		</dependency>
 
 		<!-- The extension contract an aggregator JAR contributes Guice modules through: the harness
