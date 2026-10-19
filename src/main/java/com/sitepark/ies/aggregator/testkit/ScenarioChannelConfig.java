@@ -21,15 +21,19 @@ import org.jspecify.annotations.Nullable;
  *     none
  * @param primaryChannel whether objects have a primary channel besides this one; without it {@code
  *     ChannelProvider.primary} answers empty, as for an object no pool assigns one
+ * @param tenantName the name of the tenant, or {@code null} if the scenario names none - then the
+ *     channel answers none, so a fallback to it has to be shown by a scenario that names one
  */
 record ScenarioChannelConfig(
     @Nullable String nature,
     Map<String, String> attributes,
     @Nullable UrlLookup urlLookup,
-    boolean primaryChannel) {
+    boolean primaryChannel,
+    @Nullable String tenantName) {
 
   /** A channel that declares neither a nature nor a single attribute. */
-  static final ScenarioChannelConfig EMPTY = new ScenarioChannelConfig(null, Map.of(), null, false);
+  static final ScenarioChannelConfig EMPTY =
+      new ScenarioChannelConfig(null, Map.of(), null, false, null);
 
   ScenarioChannelConfig {
     attributes = Map.copyOf(attributes);
@@ -41,11 +45,13 @@ record ScenarioChannelConfig(
       @JsonProperty("nature") @Nullable String nature,
       @JsonProperty("attributes") @Nullable Map<String, String> attributes,
       @JsonProperty("urlLookup") @Nullable UrlLookup urlLookup,
-      @JsonProperty("primaryChannel") @Nullable Boolean primaryChannel) {
+      @JsonProperty("primaryChannel") @Nullable Boolean primaryChannel,
+      @JsonProperty("tenantName") @Nullable String tenantName) {
     return new ScenarioChannelConfig(
         nature,
         attributes == null ? Map.of() : attributes,
         urlLookup,
-        Boolean.TRUE.equals(primaryChannel));
+        Boolean.TRUE.equals(primaryChannel),
+        tenantName);
   }
 }

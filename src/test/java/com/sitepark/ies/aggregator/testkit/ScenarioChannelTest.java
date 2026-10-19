@@ -98,7 +98,7 @@ class ScenarioChannelTest {
     Channel channel =
         channel(
             Map.of("1000", Map.of("id", 1000)),
-            ScenarioChannelConfig.of("intranet", Map.of(), null, null));
+            ScenarioChannelConfig.of("intranet", Map.of(), null, null, null));
 
     assertThat(channel.nature())
         .as("a rule keyed to an internal web has to be shown the scenario that declares one")
@@ -110,7 +110,7 @@ class ScenarioChannelTest {
     Channel channel =
         channel(
             Map.of("1000", Map.of("id", 1000)),
-            ScenarioChannelConfig.of(null, Map.of("sp_vv_mode", "intern"), null, null));
+            ScenarioChannelConfig.of(null, Map.of("sp_vv_mode", "intern"), null, null, null));
 
     assertThat(channel.attribute("sp_vv_mode"))
         .as("the attribute the scenario sets is answered verbatim")
@@ -130,6 +130,22 @@ class ScenarioChannelTest {
     assertThat(channel.attribute("sp_vv_mode"))
         .as("so does an attribute below the channel block")
         .contains("intern");
+    assertThat(channel.tenantName())
+        .as("and the tenant the channel block names")
+        .contains("Musterstadt");
+  }
+
+  @Test
+  void answersTheTenantOnlyWhereTheScenarioNamesOne() {
+    Map<String, Object> repository = Map.of("1000", Map.of("id", 1000));
+
+    assertThat(channel(repository, ScenarioChannelConfig.EMPTY).tenantName())
+        .as("a fallback to the tenant has to be shown by a scenario that names one")
+        .isEmpty();
+    assertThat(
+            channel(repository, ScenarioChannelConfig.of(null, Map.of(), null, null, "Musterstadt"))
+                .tenantName())
+        .contains("Musterstadt");
   }
 
   @Test
@@ -140,7 +156,9 @@ class ScenarioChannelTest {
         .as("a nature without urlLookup links no object it does not publish")
         .isEmpty();
     assertThat(
-            channel(repository, ScenarioChannelConfig.of(null, Map.of(), UrlLookup.STRICT, null))
+            channel(
+                    repository,
+                    ScenarioChannelConfig.of(null, Map.of(), UrlLookup.STRICT, null, null))
                 .urlLookup())
         .contains(UrlLookup.STRICT);
   }
@@ -156,7 +174,7 @@ class ScenarioChannelTest {
         .isEmpty();
     assertThat(
             new ScenarioChannelProvider(
-                    repository, null, ScenarioChannelConfig.of(null, Map.of(), null, true))
+                    repository, null, ScenarioChannelConfig.of(null, Map.of(), null, true, null))
                 .primary(1000))
         .isPresent();
   }
@@ -171,7 +189,7 @@ class ScenarioChannelTest {
                 "1002", Map.of("id", 1002, "published", "primary")));
     ScenarioChannelProvider provider =
         new ScenarioChannelProvider(
-            repository, null, ScenarioChannelConfig.of(null, Map.of(), null, true));
+            repository, null, ScenarioChannelConfig.of(null, Map.of(), null, true, null));
     Channel primary = provider.primary(1002).orElseThrow();
 
     assertThat(provider.current().isPublished(1000)).isTrue();
@@ -192,7 +210,7 @@ class ScenarioChannelTest {
     Repository repository = new Repository(Map.of("1000", Map.of("id", 1000)));
     ScenarioChannelProvider provider =
         new ScenarioChannelProvider(
-            repository, null, ScenarioChannelConfig.of(null, Map.of(), null, true));
+            repository, null, ScenarioChannelConfig.of(null, Map.of(), null, true, null));
 
     assertThat(provider.current().resolveUri(UriTarget.ofObject(1000)).map(Object::toString))
         .as("a page of the current site links to the target by its path")

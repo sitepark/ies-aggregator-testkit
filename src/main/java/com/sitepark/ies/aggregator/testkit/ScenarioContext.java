@@ -115,8 +115,8 @@ public final class ScenarioContext {
 
   /**
    * Top-level key in a scenario file carrying what the channel says about itself: {@code {"nature":
-   * "intranet", "attributes": {"name": "value"}}}. An absent block means a channel that declares
-   * neither — the same answer a publisher with nothing configured gives.
+   * "intranet", "attributes": {"name": "value"}, "tenantName": "Stadt"}}. An absent block means a
+   * channel that declares none of them — the same answer a publisher with nothing configured gives.
    */
   public static final String CHANNEL_KEY = "channel";
 

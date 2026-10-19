@@ -63,6 +63,17 @@ final class ScenarioChannel implements Channel {
     return this.name;
   }
 
+  /**
+   * The tenant the scenario's {@code channel} block names, and none otherwise.
+   *
+   * <p>Production always knows its tenant. Answering a default here anyway would let a fallback to
+   * the tenant pass in every scenario without one ever having said which tenant it is.
+   */
+  @Override
+  public Optional<String> tenantName() {
+    return Optional.ofNullable(this.config.tenantName());
+  }
+
   @Override
   public String encoding() {
     return "UTF-8";

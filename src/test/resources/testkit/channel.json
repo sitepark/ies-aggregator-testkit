@@ -3,7 +3,8 @@
     "nature": "intranet",
     "attributes": {
       "sp_vv_mode": "intern"
-    }
+    },
+    "tenantName": "Musterstadt"
   },
   "repository": {
     "1000": {
