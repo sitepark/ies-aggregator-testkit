@@ -49,6 +49,9 @@ final class Repository {
   /** Entry key that takes an entry out of publication; absent means published. */
   private static final String PUBLISHED_KEY = "published";
 
+  /** Value of {@link #PUBLISHED_KEY} for an entry published in its primary channel only. */
+  private static final String PUBLISHED_IN_PRIMARY_ONLY = "primary";
+
   private final Map<String, Object> entries;
   private final Map<String, String> anchors;
 
@@ -136,11 +139,23 @@ final class Repository {
    * a barrier switched off, a page not released yet — and an id that stands for nothing must not
    * come back as published.
    *
+   * <p>{@code "published": "primary"} describes an object published in its primary channel and not
+   * in the current one - the state the primary-channel fallback of a teaser exists for, which a
+   * single answer for both channels cannot express.
+   *
    * @param id the entry id
+   * @param current whether the question is asked of the current channel or of the primary one
    */
-  boolean isPublishedEntry(String id) {
+  boolean isPublishedEntry(String id, boolean current) {
     Object entry = this.entries.get(id);
-    return entry instanceof Map && !Boolean.FALSE.equals(asObjectMap(entry).get(PUBLISHED_KEY));
+    if (!(entry instanceof Map)) {
+      return false;
+    }
+    Object published = asObjectMap(entry).get(PUBLISHED_KEY);
+    if (PUBLISHED_IN_PRIMARY_ONLY.equals(published)) {
+      return !current;
+    }
+    return !Boolean.FALSE.equals(published);
   }
 
   /**

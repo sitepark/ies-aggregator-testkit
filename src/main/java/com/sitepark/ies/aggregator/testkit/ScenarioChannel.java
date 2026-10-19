@@ -115,6 +115,7 @@ final class ScenarioChannel implements Channel {
   /**
    * Answers from the scenario, not with a blanket yes: an entry the scenario declares is published
    * unless it carries {@code "published": false}, and an id it does not declare is not published.
+   * {@code "published": "primary"} is published in the primary channel and not in the current one.
    *
    * <p>The former constant {@code true} was the more generous answer, and it hid a real defect for
    * as long as it stood — the IES adapter answered a constant {@code false}, so every caller of
@@ -122,7 +123,7 @@ final class ScenarioChannel implements Channel {
    */
   @Override
   public boolean isPublished(int objectId) {
-    return this.repository.isPublishedEntry(Integer.toString(objectId));
+    return this.repository.isPublishedEntry(Integer.toString(objectId), this.current);
   }
 
   @Override

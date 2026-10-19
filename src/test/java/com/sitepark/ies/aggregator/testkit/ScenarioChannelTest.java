@@ -162,6 +162,32 @@ class ScenarioChannelTest {
   }
 
   @Test
+  void answersThePublicationOfEachChannelFromTheEntry() {
+    Repository repository =
+        new Repository(
+            Map.of(
+                "1000", Map.of("id", 1000),
+                "1001", Map.of("id", 1001, "published", false),
+                "1002", Map.of("id", 1002, "published", "primary")));
+    ScenarioChannelProvider provider =
+        new ScenarioChannelProvider(
+            repository, null, ScenarioChannelConfig.of(null, Map.of(), null, true));
+    Channel primary = provider.primary(1002).orElseThrow();
+
+    assertThat(provider.current().isPublished(1000)).isTrue();
+    assertThat(primary.isPublished(1000)).isTrue();
+    assertThat(provider.current().isPublished(1001)).isFalse();
+    assertThat(primary.isPublished(1001)).isFalse();
+    assertThat(provider.current().isPublished(1002))
+        .as("an entry published in its primary channel only is not published here")
+        .isFalse();
+    assertThat(primary.isPublished(1002)).isTrue();
+    assertThat(provider.current().isPublished(1003))
+        .as("an id the scenario does not declare is published nowhere")
+        .isFalse();
+  }
+
+  @Test
   void answersAPathInTheCurrentChannelAndTheFullUrlInAnother() {
     Repository repository = new Repository(Map.of("1000", Map.of("id", 1000)));
     ScenarioChannelProvider provider =
