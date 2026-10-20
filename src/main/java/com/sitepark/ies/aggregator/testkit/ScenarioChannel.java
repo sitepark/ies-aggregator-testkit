@@ -20,11 +20,14 @@ import org.jspecify.annotations.Nullable;
  * internally is an ordinary thing for an editor to do, and the caller is not made to find out what
  * kind of object it is pointing at first.
  *
- * <p>Two things this must not go back to. An early version answered every target with a page URL:
+ * <p>Three things this must not go back to. An early version answered every target with a page URL:
  * that generosity hid a published bug, 322 media meta pages went out with {@code "url" =>
  * ".meta.php"} while every scenario stayed green. The version after it answered nothing at all for
  * a medium, which was right about the page URL and wrong about the link - production dropped the
- * whole link, and no scenario could show it.
+ * whole link, and no scenario could show it. The third still answered a page URL for every object
+ * the scenario declared, an unpublished one included, although production answers none where the
+ * publication holds no file for the object: a link to an unpublished page came out as a working
+ * link in every scenario and was dropped in production.
  *
  * <p>As in production, the current channel answers a path and any other channel the full URL with
  * its host, so a link into another channel keeps pointing at that channel's site.
@@ -155,8 +158,14 @@ final class ScenarioChannel implements Channel {
    * <p>A medium still gets no page URL. It has none: it is published under its binary, and the
    * caller does not have to know that before asking. This mirrors the production channel, whose
    * object lookup falls back to the article's own binary for exactly this reason.
+   *
+   * <p>An object this channel does not publish has no URL, whatever kind it is: production answers
+   * empty when the publication holds no file for it, see {@link #isPublished(int)}.
    */
   private Optional<PlainUri> objectUri(int objectId) {
+    if (!this.isPublished(objectId)) {
+      return Optional.empty();
+    }
     String id = Integer.toString(objectId);
     if (!this.repository.isMediaEntry(id)) {
       return Optional.of(PlainUri.of("https://example.com/object/" + objectId));

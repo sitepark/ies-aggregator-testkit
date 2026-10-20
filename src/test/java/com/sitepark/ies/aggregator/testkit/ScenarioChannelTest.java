@@ -206,6 +206,42 @@ class ScenarioChannelTest {
   }
 
   @Test
+  void answersNoPageUrlForAnObjectTheChannelDoesNotPublish() {
+    Repository repository =
+        new Repository(
+            Map.of(
+                "1000", Map.of("id", 1000, "published", false),
+                "1001", Map.of("id", 1001, "published", "primary"),
+                "1002", Map.of("id", 1002, "media", Map.of("id", 4712), "published", false)));
+    ScenarioChannelProvider provider =
+        new ScenarioChannelProvider(
+            repository, null, ScenarioChannelConfig.of(null, Map.of(), null, true, null));
+    Channel current = provider.current();
+
+    assertThat(current.resolveUri(UriTarget.ofObject(1000)))
+        .as("production answers empty when the publication has no file for the object")
+        .isEmpty();
+    assertThat(current.resolveUri(UriTarget.ofObject(1001)))
+        .as("published in the primary channel only is not published in the current one")
+        .isEmpty();
+    assertThat(provider.primary(1001).orElseThrow().resolveUri(UriTarget.ofObject(1001)))
+        .as("the primary channel does publish it")
+        .isPresent();
+    assertThat(current.resolveUri(UriTarget.ofObject(1002)))
+        .as("an unpublished medium has no download URL either")
+        .isEmpty();
+  }
+
+  @Test
+  void answersNoPageUrlForAnIdTheScenarioDoesNotDeclare() {
+    Channel channel = channel(Map.of("1000", Map.of("id", 1000)));
+
+    assertThat(channel.resolveUri(UriTarget.ofObject(4711)))
+        .as("an id that stands for nothing is published nowhere")
+        .isEmpty();
+  }
+
+  @Test
   void answersAPathInTheCurrentChannelAndTheFullUrlInAnother() {
     Repository repository = new Repository(Map.of("1000", Map.of("id", 1000)));
     ScenarioChannelProvider provider =
