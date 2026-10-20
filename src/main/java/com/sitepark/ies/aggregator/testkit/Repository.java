@@ -2,8 +2,10 @@ package com.sitepark.ies.aggregator.testkit;
 
 import com.sitepark.ies.aggregator.resolver.Resolver;
 import com.sitepark.ies.aggregator.resolver.ResolverPath;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
@@ -204,6 +206,70 @@ final class Repository {
     return node.get(MEDIA_KEY) instanceof Map
         && asObjectMap(node.get(MEDIA_KEY)).get("id") instanceof Number id
         && id.intValue() == mediaId;
+  }
+
+  /**
+   * Returns the ids of the entries whose link field points at the given entry - the inverse of
+   * following the link, which production answers from its link index.
+   *
+   * <p>{@code linkField} is spelled as the referrer stores it, without the iterate path: the part
+   * after its last dot is the link type, the part before it the field name ({@code
+   * "sp_parent_navigation.link"} finds a link in any entry of {@code sp_parent_navigation_iterate}).
+   * The whole {@code content} of every entry is searched, lists and iterate entries included, for a
+   * field of that name whose value names the target in one of the forms a link takes: a bare id,
+   * {@code {"link": id}}, or a list of these.
+   *
+   * <p>Known generosity: the link type is ignored. Production tells the link kinds apart by the
+   * search name of the link, the testkit does not distinguish them, so a field linking the target
+   * counts whatever type was asked for.
+   *
+   * <p>Publication is not looked at, as in production: an unpublished referrer is a referrer. Groups
+   * are left out. Each referrer is listed once, in the order of the repository.
+   *
+   * @param targetId the id of the linked entry
+   * @param linkField the link field as a referrer stores it, {@code <field>.<type>}
+   */
+  List<String> referrersOf(String targetId, String linkField) {
+    int dot = linkField.lastIndexOf('.');
+    String field = dot < 0 ? linkField : linkField.substring(0, dot);
+    List<String> referrers = new ArrayList<>();
+    this.entries.forEach(
+        (id, entry) -> {
+          if (!(entry instanceof Map) || this.isGroupEntry(id)) {
+            return;
+          }
+          if (asObjectMap(entry).get(CONTENT_KEY) instanceof Map<?, ?> content
+              && holdsLink(content, field, targetId)) {
+            referrers.add(id);
+          }
+        });
+    return List.copyOf(referrers);
+  }
+
+  /** Whether the value, searched recursively, has a {@code field} that links {@code targetId}. */
+  private static boolean holdsLink(@Nullable Object value, String field, String targetId) {
+    if (value instanceof Map<?, ?> map) {
+      for (Map.Entry<?, ?> member : map.entrySet()) {
+        if ((field.equals(member.getKey()) && linksTo(member.getValue(), targetId))
+            || holdsLink(member.getValue(), field, targetId)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    return value instanceof List<?> list
+        && list.stream().anyMatch(element -> holdsLink(element, field, targetId));
+  }
+
+  /** Whether a link value names the target: a bare id, an id reference, {@code {"link": ...}}. */
+  private static boolean linksTo(@Nullable Object value, String targetId) {
+    if (value instanceof List<?> list) {
+      return list.stream().anyMatch(element -> linksTo(element, targetId));
+    }
+    if (value instanceof Map<?, ?> node && node.get("link") != null) {
+      return linksTo(node.get("link"), targetId);
+    }
+    return targetId.equals(entryId(value));
   }
 
   /**

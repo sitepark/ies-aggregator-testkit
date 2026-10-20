@@ -271,6 +271,27 @@ final class RepositoryResolver implements GroupResolver {
         : GroupResolver.empty(resolver.path());
   }
 
+  /**
+   * The entries whose link field points at this one, taken from the repository (see {@link
+   * Repository#referrersOf(String, String)}). Each becomes a new root within this resolver's
+   * navigation chain, as a group member does.
+   */
+  @Override
+  public List<EntityResolver> resolveReferrers(String linkField) {
+    String id = this.structural("id").asString("");
+    if (id.isEmpty()) {
+      return List.of();
+    }
+    List<EntityResolver> referrers = new ArrayList<>();
+    for (String referrerId : this.repository.referrersOf(id, linkField)) {
+      RepositoryResolver referrer = this.repository.enterRoot(this.resolverPath, referrerId);
+      if (referrer != null) {
+        referrers.add(referrer);
+      }
+    }
+    return List.copyOf(referrers);
+  }
+
   /** The raw value of a link field, unwrapped from its {@code "link"} key if it has one. */
   private @Nullable Object linkValue(String key) {
     Object value = this.field(key);
