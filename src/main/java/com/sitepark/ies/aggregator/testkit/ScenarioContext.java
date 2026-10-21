@@ -93,6 +93,14 @@ public final class ScenarioContext {
   public static final String OBJECT_TYPE_KEY = "objectType";
 
   /**
+   * Top-level key in a scenario file carrying the global object-type definitions: a map {@code type
+   * name -> configuration}, what {@code ObjectTypeConfigProvider.typeConfiguration} answers
+   * independent of where an object sits. It shares no data with {@link #OBJECT_TYPE_KEY}; a type
+   * the block does not name, or an absent block, answers empty.
+   */
+  public static final String OBJECT_TYPES_KEY = "objectTypes";
+
+  /**
    * Top-level key in a scenario file carrying the {@link Repository}: a flat map {@code id ->
    * entry} of the objects the aggregation navigates (the section source and any linked objects).
    */
@@ -252,7 +260,8 @@ public final class ScenarioContext {
             channelProvider,
             new ScenarioVariantConfigProvider(mapper, raw.get(VARIANT_CONFIG_KEY)),
             rootResolverFactory,
-            new ScenarioObjectTypeConfigProvider(mapper, raw.get(OBJECT_TYPE_KEY)),
+            new ScenarioObjectTypeConfigProvider(
+                mapper, raw.get(OBJECT_TYPE_KEY), raw.get(OBJECT_TYPES_KEY)),
             new PublisherPorts(resourceState, publishedLinks, regeneration)));
     modules.add(binder -> binder.bind(ScenarioFixture.class).toInstance(fixture));
     modules.addAll(ExtensionModules.of(packages));

@@ -113,7 +113,8 @@ extends: their constructors are package-private, as production never calls them 
 | `repository` | the CMS: a flat map `id → entry`, fields under `content`, links as id references, groups by a `group` block, media by a `media` block, anchors indexed |
 | `options` | the aggregator's configured options, bound with `context.options(Class)` |
 | `access` | the access restriction the channel reports for the resource |
-| `objectType` | the configuration of the resource's object type |
+| `objectType` | the configuration of the resource's object type at its place (`configuration(objectId, type)`) |
+| `objectTypes` | the global definitions, a map `type name -> config` (`typeConfiguration(type, class)`); shares no data with `objectType`, an unnamed type answers empty |
 | `variantConfig` | the image-variant catalog of the project configuration |
 
 The entry `1000` is the source the aggregation starts from (`ScenarioContext.SOURCE_ID`).
