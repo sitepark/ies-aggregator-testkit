@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  * An aggregator that writes a headline and, if the scenario configures one, a greeting.
  *
  * <p>Stands in for the aggregators of a project using the harness: package-private constructor with
- * {@code @Inject} like a real one, so that only the injector can build it, and {@link OptionsAware}
+ * {@code @Inject} like a real one, so that only the container can build it, and {@link OptionsAware}
  * so that the options have to arrive the way production delivers them.
  */
 public final class ProbeAggregator implements Aggregator, OptionsAware<ProbeOptions> {

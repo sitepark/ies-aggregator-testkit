@@ -5,8 +5,8 @@ import jakarta.inject.Inject;
 
 /**
  * A collaborator of a probe assembler, standing in for the ones a custom-extension project brings
- * along: its own class, known neither to {@code ScenarioModule} nor to
- * {@code ScenarioAssemblerFactory}, reachable only because the injector builds it from this
+ * along: its own class, known neither to {@code ScenarioBeans} nor to
+ * {@code ScenarioAssemblerFactory}, reachable only because the container builds it from this
  * constructor and resolves the port it asks for.
  */
 public final class ProbeGreeting {

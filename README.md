@@ -13,8 +13,8 @@ instead of being logged, the clock is frozen, the scaler is deterministic.
 flowchart LR
     S[("scenario.json<br/>repository, options, …")]
     R["Repository<br/><i>in-memory CMS</i>"]
-    M["ScenarioModule<br/><i>binds the ports</i>"]
-    G["Guice injector<br/><i>builds assemblers and<br/>collaborators from @Inject</i>"]
+    M["ScenarioBeans<br/><i>declares the ports</i>"]
+    G["Spring context<br/><i>builds assemblers and<br/>collaborators from @Inject</i>"]
     A["your aggregator<br/><i>unmodified</i>"]
     O[("resource as<br/>normalized JSON")]
     E[("scenario.expected.json")]
@@ -28,7 +28,7 @@ flowchart LR
 <dependency>
   <groupId>com.sitepark.ies</groupId>
   <artifactId>ies-aggregator-testkit</artifactId>
-  <version>1.0.0-SNAPSHOT</version>
+  <version>2.0.0-SNAPSHOT</version>
   <scope>test</scope>
 </dependency>
 ```
@@ -128,24 +128,24 @@ The entry `1000` is the source the aggregation starts from (`ScenarioContext.SOU
 | `ChannelProvider`, `Channel` | `ScenarioChannel` — deterministic URLs, answers only what a publication would |
 | `ImageScaler` | `ScenarioImageScaler` — sizes and URLs derived from the request, no pixels |
 | `ObjectTypeConfigProvider`, `VariantConfigProvider`, `StructuredValueParser` | read from the scenario blocks |
-| `AssemblerFactory` | `ScenarioAssemblerFactory` — ClassGraph finds `@AssemblerBinding` classes, the production lookup semantics pick the winner, Guice builds it |
+| `AssemblerFactory` | `ScenarioAssemblerFactory` — ClassGraph finds `@AssemblerBinding` classes, the production lookup semantics pick the winner, the container builds it |
 | `AggregatorErrorHandler` | throws — a scenario is a fixture, an error is a failure |
 | `Clock` | fixed at `2026-09-01T12:00:00Z` |
 
-Everything concrete — services, resolvers, builders, dispatchers — is reached through just-in-time
-bindings. An assembler with a collaborator of its own needs no change to the harness.
+Everything concrete — services, resolvers, builders, dispatchers — is created just in time from its
+`@Inject` constructor, as in the production context of the extensions. An assembler with a
+collaborator of its own needs no change to the harness.
 
 ## Ports an aggregator JAR binds itself
 
 A port the platform does not provide is declared and bound by the aggregator JAR: an `Extension`
-with a static `@ConfigureFactory` method adds a Guice module, and a module built on the JAR replaces
-the shipped default through an `OptionalBinder`. The harness installs those modules the way the
-production `ExtensionFactory` does — every `Extension` under the scanned packages — so an assembler
+with a static `@ConfigureFactory` method ships a default (`ConfigurationContext.bindDefault`), and a
+module built on the JAR replaces it (`ConfigurationContext.bind`). The harness declares those bindings
+the way the production `ExtensionFactory` does — every `Extension` under the scanned packages — so an assembler
 gets the binding its JAR ships, not one the harness invents.
 
 To stand in for such a port with scenario data, a project declares an extension in its **test**
-sources that replaces the default (`OptionalBinder…setBinding()`) with an implementation of its
-own. That implementation reads its block from the scenario file through the injected
+sources that replaces the default (`bind`) with an implementation of its own. That implementation reads its block from the scenario file through the injected
 `ScenarioFixture`:
 
 ```java
@@ -156,7 +156,8 @@ ScenarioGreeting(ScenarioFixture fixture) {
 ```
 
 The block is the project's own; the harness only hands it through. A port the platform provides
-must not be bound this way: Guice refuses the second binding in production as well as here.
+must not be bound this way: the harness refuses a second bean of a port, and two bindings of one type
+are refused in production as well as here.
 
 Two aggregation paths are offered, and they differ on purpose. `aggregate(ComponentAggregation, type)`
 asks the component aggregation directly and attaches the component if it reports content.

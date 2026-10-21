@@ -1,6 +1,5 @@
 package com.sitepark.ies.aggregator.testkit.extensionfixture.override;
 
-import com.google.inject.multibindings.OptionalBinder;
 import com.sitepark.ies.aggregator.testkit.extensionfixture.Salutation;
 import com.sitepark.ies.extension.api.ConfigurationContext;
 import com.sitepark.ies.extension.api.Extension;
@@ -14,11 +13,7 @@ public final class ScenarioSalutationExtension implements Extension {
 
   @ConfigureFactory
   public static void configureInjection(ConfigurationContext context) {
-    context.addInjectionModule(
-        binder ->
-            OptionalBinder.newOptionalBinder(binder, Salutation.class)
-                .setBinding()
-                .to(ScenarioSalutation.class));
+    context.bind(Salutation.class, ScenarioSalutation.class);
   }
 
   @Override

@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.inject.Guice;
 import com.sitepark.ies.aggregator.port.AssemblerChain;
 import com.sitepark.ies.aggregator.port.AssemblerFactory;
 import com.sitepark.ies.aggregator.port.Channel;
@@ -42,20 +41,21 @@ class ObjectTypeAssemblerFactoryTest {
    * the probes have no collaborators, so nothing is ever resolved through them.
    */
   private static AssemblerFactory factory() {
-    return Guice.createInjector(
-            new ScenarioModule(
-                AssemblerPackages.of("com.sitepark.ies.aggregator.testkit.chainfixture"),
-                mock(MediaProvider.class),
-                mock(StructuredValueParser.class),
-                channelProvider(),
-                mock(VariantConfigProvider.class),
-                mock(RootResolverFactory.class),
-                mock(ObjectTypeConfigProvider.class),
-                new PublisherPorts(
-                    new ScenarioResourceState(),
-                    new ScenarioPublishedLinks(),
-                    new ScenarioRegeneration(ScenarioModule.FIXED_CLOCK))))
-        .getInstance(AssemblerFactory.class);
+    return ScenarioContainer.start(
+            List.of(
+                new ScenarioBeans(
+                    AssemblerPackages.of("com.sitepark.ies.aggregator.testkit.chainfixture"),
+                    mock(MediaProvider.class),
+                    mock(StructuredValueParser.class),
+                    channelProvider(),
+                    mock(VariantConfigProvider.class),
+                    mock(RootResolverFactory.class),
+                    mock(ObjectTypeConfigProvider.class),
+                    new PublisherPorts(
+                        new ScenarioResourceState(),
+                        new ScenarioPublishedLinks(),
+                        new ScenarioRegeneration(ScenarioBeans.FIXED_CLOCK)))))
+        .getBean(AssemblerFactory.class);
   }
 
   /** A root resolver of a single object of the given object type. */

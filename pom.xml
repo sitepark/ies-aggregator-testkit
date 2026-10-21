@@ -5,7 +5,7 @@
 
 	<groupId>com.sitepark.ies</groupId>
 	<artifactId>ies-aggregator-testkit</artifactId>
-	<version>1.1.0-SNAPSHOT</version>
+	<version>2.0.0-SNAPSHOT</version>
 
 	<name>IES Aggregator Testkit</name>
 	<description>Scenario harness for IES aggregators: loads a JSON scenario as an in-memory CMS,
@@ -59,12 +59,6 @@
 
 	<dependencyManagement>
 		<dependencies>
-			<!-- Guice 7.0.0 pins Guava 31, which still pulls in jsr305; newer Guava uses JSpecify -->
-			<dependency>
-				<groupId>com.google.guava</groupId>
-				<artifactId>guava</artifactId>
-				<version>33.7.2-jre</version>
-			</dependency>
 			<dependency>
 				<groupId>org.junit</groupId>
 				<artifactId>junit-bom</artifactId>
@@ -107,28 +101,30 @@
 			<version>4.8.196</version>
 		</dependency>
 
-		<!-- The extension contract an aggregator JAR contributes Guice modules through: the harness
-		     installs those modules the way the production ExtensionFactory does. An ordinary
+		<!-- The extension contract an aggregator JAR registers its bindings through: the harness
+		     declares those bindings the way the production ExtensionFactory does. An ordinary
 		     dependency, not provided, because a project's test classpath must be able to load the
 		     extensions of every JAR it builds on, also when the project declares no extension of its
 		     own. Version as IES pins it. -->
 		<dependency>
 			<groupId>com.sitepark.ies</groupId>
 			<artifactId>ies-extension-api</artifactId>
-			<version>1.1.0</version>
+			<version>2.0.0-SNAPSHOT</version>
 		</dependency>
 
 		<!-- Constructor injection for the discovered assemblers and their collaborators, the way
-		     the production container does it: the harness binds the ports and lets the injector
-		     build everything else from the @Inject constructors. Version and classifier as IES
-		     pins them - 7 is the jakarta.inject generation, and the "classes" variant is the one
-		     without the repackaged ASM/cglib that only AOP needs. Guava and aopalliance come along
-		     either way, they are ordinary dependencies of both variants. -->
+		     the production container does it: the harness declares the ports and lets a Spring
+		     context create everything else just in time from the @Inject constructors. Version as
+		     IES pins it. -->
 		<dependency>
-			<groupId>com.google.inject</groupId>
-			<artifactId>guice</artifactId>
-			<version>7.0.0</version>
-			<classifier>classes</classifier>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context</artifactId>
+			<version>7.0.9</version>
+		</dependency>
+		<dependency>
+			<groupId>jakarta.inject</groupId>
+			<artifactId>jakarta.inject-api</artifactId>
+			<version>2.0.1</version>
 		</dependency>
 
 		<!-- The scenario suite base class is JUnit and AssertJ: it declares the parameterized case and

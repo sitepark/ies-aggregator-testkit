@@ -1,8 +1,5 @@
 package com.sitepark.ies.aggregator.testkit;
 
-import com.google.inject.ConfigurationException;
-import com.google.inject.Injector;
-import com.google.inject.ProvisionException;
 import com.sitepark.ies.aggregator.AssemblerBinding;
 import com.sitepark.ies.aggregator.AssemblerCondition;
 import com.sitepark.ies.aggregator.port.AssemblerChain;
@@ -22,6 +19,8 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.BeanFactory;
 
 /**
  * Lightweight {@link AssemblerFactory} for tests that reproduces the production lookup semantics —
@@ -29,8 +28,8 @@ import org.jspecify.annotations.Nullable;
  * without the heavy IES extension/DI runtime.
  *
  * <p>The real assembler classes run unmodified, and so do their collaborators: this factory only
- * finds the classes and picks the winner, the injector configured by {@link ScenarioModule} builds
- * them. Nothing here knows any assembler or any collaborator by name, so a new one — in this project
+ * finds the classes and picks the winner, the container with the beans of {@link ScenarioBeans}
+ * builds them. Nothing here knows any assembler or any collaborator by name, so a new one — in this project
  * or in a custom-extension project reusing the testkit — needs no change to the testkit.
  *
  * <p>The classes are discovered via {@link ClassGraph} rather than the production class finder,
@@ -62,12 +61,12 @@ final class ScenarioAssemblerFactory implements AssemblerFactory {
   }
 
   private final List<Class<?>> assemblerClasses;
-  private final Injector injector;
+  private final BeanFactory container;
 
   @Inject
-  ScenarioAssemblerFactory(AssemblerPackages assemblerPackages, Injector injector) {
+  ScenarioAssemblerFactory(AssemblerPackages assemblerPackages, BeanFactory container) {
     this.assemblerClasses = assemblerClasses(assemblerPackages.packages());
-    this.injector = injector;
+    this.container = container;
   }
 
   @Override
@@ -153,17 +152,17 @@ final class ScenarioAssemblerFactory implements AssemblerFactory {
   }
 
   /**
-   * Builds a discovered class through the injector, exactly as production builds it: from its
+   * Builds a discovered class through the container, exactly as production builds it: from its
    * {@code @Inject} constructor, with every collaborator resolved recursively.
    *
-   * <p>Guice reports a missing binding against the type it could not reach, which is often several
+   * <p>The container reports a missing bean against the type it could not reach, which is often several
    * constructors deep; the class actually asked for is added here, because that is the one whose
    * scenario failed.
    */
   private Object instantiate(Class<?> impl) {
     try {
-      return this.injector.getInstance(impl);
-    } catch (ConfigurationException | ProvisionException e) {
+      return this.container.getBean(impl);
+    } catch (BeansException e) {
       throw new IllegalStateException("Cannot instantiate " + impl.getName(), e);
     }
   }

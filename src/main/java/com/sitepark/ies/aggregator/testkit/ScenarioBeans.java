@@ -1,8 +1,5 @@
 package com.sitepark.ies.aggregator.testkit;
 
-import com.google.inject.Binder;
-import com.google.inject.Module;
-import com.google.inject.Singleton;
 import com.sitepark.ies.aggregator.AggregatorErrorHandler;
 import com.sitepark.ies.aggregator.AggregatorException;
 import com.sitepark.ies.aggregator.output.DomainObjectMapper;
@@ -21,18 +18,22 @@ import com.sitepark.ies.aggregator.value.StructuredValueParser;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.function.Consumer;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.support.RootBeanDefinition;
+import org.springframework.context.support.GenericApplicationContext;
 
 /**
- * Binds the ports a scenario stands in for, so the injector can build every assembler and every
+ * Declares the ports a scenario stands in for, so the container can build every assembler and every
  * collaborator from their {@code @Inject} constructors.
  *
- * <p>This mirrors the production {@code AggregatorModule}: only ports are declared here, everything
- * concrete — services, resolvers, builders, dispatchers — is reached through just-in-time bindings.
+ * <p>This mirrors the production {@code AggregatorConfiguration}: only ports are declared here, everything
+ * concrete — services, resolvers, builders, dispatchers — is created just in time.
  * A new assembler with a new collaborator therefore needs no change to the testkit; that is the
  * whole point of this module, and what lets a custom-extension project reuse the harness for its own
  * assemblers.
  *
- * <p>Three bindings are deliberately <em>not</em> what production binds, and each buys a property a
+ * <p>Three beans are deliberately <em>not</em> what production declares, and each buys a property a
  * golden file needs:
  *
  * <ul>
@@ -43,7 +44,7 @@ import java.time.ZoneOffset;
  *   <li>the {@link ImageScaler} is the deterministic {@link ScenarioImageScaler}.
  * </ul>
  */
-final class ScenarioModule implements Module {
+final class ScenarioBeans implements Consumer<GenericApplicationContext> {
 
   /**
    * The clock every assembler reads the current time from. Pinned, because a golden file cannot
@@ -62,7 +63,7 @@ final class ScenarioModule implements Module {
   private final ObjectTypeConfigProvider objectTypeConfigProvider;
   private final PublisherPorts publisherPorts;
 
-  ScenarioModule(
+  ScenarioBeans(
       AssemblerPackages assemblerPackages,
       MediaProvider mediaProvider,
       StructuredValueParser parser,
@@ -82,27 +83,36 @@ final class ScenarioModule implements Module {
   }
 
   @Override
-  public void configure(Binder binder) {
+  public void accept(GenericApplicationContext context) {
     // Singleton, because the factory is injected into the dispatchers it hands out itself; they all
     // have to see the same instance, and the classpath scan is worth doing once per scenario.
-    binder.bind(AssemblerFactory.class).to(ScenarioAssemblerFactory.class).in(Singleton.class);
-    binder.bind(AssemblerPackages.class).toInstance(this.assemblerPackages);
+    RootBeanDefinition assemblerFactory = new RootBeanDefinition(ScenarioAssemblerFactory.class);
+    assemblerFactory.setScope(BeanDefinition.SCOPE_SINGLETON);
+    context.registerBeanDefinition(AssemblerFactory.class.getName(), assemblerFactory);
+    instance(context, AssemblerPackages.class, this.assemblerPackages);
 
-    binder.bind(MediaProvider.class).toInstance(this.mediaProvider);
-    binder.bind(StructuredValueParser.class).toInstance(this.parser);
-    binder.bind(ChannelProvider.class).toInstance(this.channelProvider);
-    binder.bind(Channel.class).toInstance(this.channelProvider.current());
-    binder.bind(VariantConfigProvider.class).toInstance(this.variantConfigProvider);
-    binder.bind(RootResolverFactory.class).toInstance(this.rootResolverFactory);
-    binder.bind(ObjectTypeConfigProvider.class).toInstance(this.objectTypeConfigProvider);
-    binder.bind(ResourceState.class).toInstance(this.publisherPorts.resourceState());
-    binder.bind(PublishedLinks.class).toInstance(this.publisherPorts.publishedLinks());
-    binder.bind(Regeneration.class).toInstance(this.publisherPorts.regeneration());
-    binder.bind(DomainObjectMapper.class).to(ReflectiveDomainObjectMapper.class);
+    instance(context, MediaProvider.class, this.mediaProvider);
+    instance(context, StructuredValueParser.class, this.parser);
+    instance(context, ChannelProvider.class, this.channelProvider);
+    instance(context, Channel.class, this.channelProvider.current());
+    instance(context, VariantConfigProvider.class, this.variantConfigProvider);
+    instance(context, RootResolverFactory.class, this.rootResolverFactory);
+    instance(context, ObjectTypeConfigProvider.class, this.objectTypeConfigProvider);
+    instance(context, ResourceState.class, this.publisherPorts.resourceState());
+    instance(context, PublishedLinks.class, this.publisherPorts.publishedLinks());
+    instance(context, Regeneration.class, this.publisherPorts.regeneration());
+    context.registerBeanDefinition(
+        DomainObjectMapper.class.getName(),
+        ScenarioContainer.definitionOf(ReflectiveDomainObjectMapper.class));
 
-    binder.bind(ImageScaler.class).toInstance(new ScenarioImageScaler());
-    binder.bind(Clock.class).toInstance(FIXED_CLOCK);
-    binder.bind(AggregatorErrorHandler.class).toInstance(ScenarioModule::fail);
+    instance(context, ImageScaler.class, new ScenarioImageScaler());
+    instance(context, Clock.class, FIXED_CLOCK);
+    instance(context, AggregatorErrorHandler.class, ScenarioBeans::fail);
+  }
+
+  /** Declares the instance as the bean of the type. */
+  static <T> void instance(GenericApplicationContext context, Class<T> type, T instance) {
+    context.registerBean(type.getName(), type, () -> instance);
   }
 
   /**

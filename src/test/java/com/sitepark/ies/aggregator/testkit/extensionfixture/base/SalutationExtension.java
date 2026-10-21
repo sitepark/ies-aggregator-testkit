@@ -1,6 +1,5 @@
 package com.sitepark.ies.aggregator.testkit.extensionfixture.base;
 
-import com.google.inject.multibindings.OptionalBinder;
 import com.sitepark.ies.aggregator.testkit.extensionfixture.Salutation;
 import com.sitepark.ies.extension.api.ConfigurationContext;
 import com.sitepark.ies.extension.api.Extension;
@@ -13,11 +12,7 @@ public final class SalutationExtension implements Extension {
 
   @ConfigureFactory
   public static void configureInjection(ConfigurationContext context) {
-    context.addInjectionModule(
-        binder ->
-            OptionalBinder.newOptionalBinder(binder, Salutation.class)
-                .setDefault()
-                .toInstance(() -> DEFAULT));
+    context.bindDefault(Salutation.class, ShippedSalutation.class);
   }
 
   @Override

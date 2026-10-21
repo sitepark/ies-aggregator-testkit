@@ -8,11 +8,11 @@ import com.sitepark.ies.aggregator.testkit.extensionfixture.base.SalutationExten
 import org.junit.jupiter.api.Test;
 
 /**
- * The harness installs the modules the extensions of the scanned packages contribute, as the
+ * The harness declares the bindings the extensions of the scanned packages register, as the
  * production {@code ExtensionFactory} does - so an assembler finds the binding its JAR ships, and a
  * project's test extension can replace it with a scenario-backed one.
  */
-class ExtensionModulesTest {
+class ExtensionBindingsTest {
 
   private static final ScenarioLayout LAYOUT =
       new ScenarioLayout("content", "ROOT", "main", "main");

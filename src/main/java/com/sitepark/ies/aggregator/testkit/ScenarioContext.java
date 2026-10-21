@@ -5,9 +5,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.Module;
 import com.sitepark.ies.aggregator.Aggregator;
 import com.sitepark.ies.aggregator.Options;
 import com.sitepark.ies.aggregator.OptionsAware;
@@ -41,7 +38,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.GenericApplicationContext;
 
 /**
  * Integration-test harness for component aggregators.
@@ -52,8 +52,8 @@ import org.jspecify.annotations.Nullable;
  * embedded structured values, a {@link ScenarioRootResolverFactory} for objects addressed by id or
  * anchor instead of being linked, and a {@link ScenarioAssemblerFactory} that runs the production
  * assembler classes unmodified. Only the ports are named here; the assemblers and their
- * collaborators are built by an injector from their {@code @Inject} constructors, as production does
- * it — see {@link ScenarioModule}.
+ * collaborators are built by a container from their {@code @Inject} constructors, as production
+ * does it — see {@link ScenarioBeans}.
  *
  * <p>The generated resource is serialized with the production {@link JsonWriter} and compared as
  * normalized (key-sorted, pretty) JSON against a golden file, so the assertion covers the whole
@@ -141,7 +141,7 @@ public final class ScenarioContext {
 
   private final Repository repository;
   private final ScenarioLayout layout;
-  private final Injector injector;
+  private final ApplicationContext container;
   private final AssemblerFactory assemblerFactory;
   private final RootResolverFactory rootResolverFactory;
   private final ChannelProvider channelProvider;
@@ -161,7 +161,7 @@ public final class ScenarioContext {
   private ScenarioContext(
       Repository repository,
       ScenarioLayout layout,
-      Injector injector,
+      ApplicationContext container,
       RootResolverFactory rootResolverFactory,
       ChannelProvider channelProvider,
       ObjectMapper jsonMapper,
@@ -172,8 +172,8 @@ public final class ScenarioContext {
       Map<String, Object> enclosingResource) {
     this.repository = repository;
     this.layout = layout;
-    this.injector = injector;
-    this.assemblerFactory = injector.getInstance(AssemblerFactory.class);
+    this.container = container;
+    this.assemblerFactory = container.getBean(AssemblerFactory.class);
     this.rootResolverFactory = rootResolverFactory;
     this.channelProvider = channelProvider;
     this.jsonMapper = jsonMapper;
@@ -241,19 +241,19 @@ public final class ScenarioContext {
     RootResolverFactory rootResolverFactory = new ScenarioRootResolverFactory(repository);
     ScenarioResourceState resourceState = new ScenarioResourceState();
     ScenarioPublishedLinks publishedLinks = new ScenarioPublishedLinks();
-    ScenarioRegeneration regeneration = new ScenarioRegeneration(ScenarioModule.FIXED_CLOCK);
+    ScenarioRegeneration regeneration = new ScenarioRegeneration(ScenarioBeans.FIXED_CLOCK);
     ChannelProvider channelProvider =
         new ScenarioChannelProvider(
             repository, accessRestriction(mapper, raw), channelConfig(mapper, raw));
     // Only the ports are wired by hand; every assembler and every collaborator behind them is built
-    // by the injector from its @Inject constructor, the way the production container does it. Next
-    // to them go the modules the extensions of the scanned packages contribute, as in production,
+    // by the container from its @Inject constructor, the way the production container does it. Next
+    // to them go the bindings the extensions of the scanned packages register, as in production,
     // and the scenario's blocks for the implementations a project's test extension binds.
     List<String> packages = Arrays.asList(assemblerPackages);
     ScenarioFixture fixture = new ScenarioFixture(mapper, raw);
-    List<Module> modules = new ArrayList<>();
-    modules.add(
-        new ScenarioModule(
+    List<Consumer<GenericApplicationContext>> registrations = new ArrayList<>();
+    registrations.add(
+        new ScenarioBeans(
             new AssemblerPackages(packages),
             new RepositoryMediaProvider(),
             parser,
@@ -263,14 +263,14 @@ public final class ScenarioContext {
             new ScenarioObjectTypeConfigProvider(
                 mapper, raw.get(OBJECT_TYPE_KEY), raw.get(OBJECT_TYPES_KEY)),
             new PublisherPorts(resourceState, publishedLinks, regeneration)));
-    modules.add(binder -> binder.bind(ScenarioFixture.class).toInstance(fixture));
-    modules.addAll(ExtensionModules.of(packages));
-    Injector injector = Guice.createInjector(modules);
+    registrations.add(context -> ScenarioBeans.instance(context, ScenarioFixture.class, fixture));
+    registrations.add(ExtensionBindings.of(packages));
+    ApplicationContext container = ScenarioContainer.start(registrations);
 
     return new ScenarioContext(
         repository,
         layout,
-        injector,
+        container,
         rootResolverFactory,
         channelProvider,
         mapper,
@@ -325,7 +325,7 @@ public final class ScenarioContext {
    * @param <T> the aggregator type
    */
   public <T> T aggregator(Class<T> type) {
-    T aggregator = this.injector.getInstance(type);
+    T aggregator = this.container.getBean(type);
     if (aggregator instanceof OptionsAware<?> optionsAware) {
       this.setOptions(optionsAware);
     }
