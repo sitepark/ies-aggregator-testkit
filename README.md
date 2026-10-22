@@ -117,6 +117,10 @@ extends: their constructors are package-private, as production never calls them 
 | `objectTypes` | the global definitions, a map `type name -> config` (`typeConfiguration(type, class)`); shares no data with `objectType`, an unnamed type answers empty |
 | `variantConfig` | the image-variant catalog of the project configuration |
 
+An entry may carry `"archive": true`; its entity descriptor then answers `isArchive()` with `true`.
+Absent or false answers `false`, and so does every group and medium whatever it declares, as
+production decides the archive state for articles only.
+
 The entry `1000` is the source the aggregation starts from (`ScenarioContext.SOURCE_ID`).
 
 ## What the harness stands in for

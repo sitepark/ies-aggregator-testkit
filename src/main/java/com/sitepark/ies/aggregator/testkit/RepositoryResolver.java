@@ -104,6 +104,9 @@ final class RepositoryResolver implements GroupResolver {
   /** The key a link field wraps its target under ({@code {"link": "4711"}}). */
   private static final String LINK_KEY = "link";
 
+  /** Entry-level flag a scenario sets to declare the entry archived. */
+  private static final String ARCHIVE_KEY = "archive";
+
   /** Field a scenario spells out a section's own, reordering-stable id under. */
   private static final String UUID_KEY = "uuid";
 
@@ -559,6 +562,22 @@ final class RepositoryResolver implements GroupResolver {
       return "resource".equals(RepositoryResolver.this.node.get(ENTITY_KIND_KEY))
           ? EntityKind.RESOURCE
           : EntityKind.PAGE;
+    }
+
+    /**
+     * Answers the entry's {@code "archive": true}; absent or anything else is {@code false}.
+     *
+     * <p>A group or a medium answers {@code false} whatever the entry declares: production decides
+     * the archive state for articles only, and a harness that let a group be archived would pass a
+     * scenario production can never reach.
+     */
+    @Override
+    public boolean isArchive() {
+      EntityKind kind = this.kind();
+      if (kind == EntityKind.GROUP || kind == EntityKind.MEDIA) {
+        return false;
+      }
+      return Boolean.TRUE.equals(RepositoryResolver.this.node.get(ARCHIVE_KEY));
     }
 
     @Override
