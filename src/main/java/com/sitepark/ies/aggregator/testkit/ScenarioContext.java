@@ -101,6 +101,14 @@ public final class ScenarioContext {
   public static final String OBJECT_TYPES_KEY = "objectTypes";
 
   /**
+   * Top-level key in a scenario file carrying the installation's global configuration: a map {@code
+   * entry name -> configuration}, what {@code GlobalConfigProvider.configuration} answers (SPML
+   * {@code system.config.global.<name>}). An entry the block does not name, or an absent block,
+   * answers empty - an unconfigured feature is off, as in production.
+   */
+  public static final String GLOBAL_KEY = "global";
+
+  /**
    * Top-level key in a scenario file carrying the {@link Repository}: a flat map {@code id ->
    * entry} of the objects the aggregation navigates (the section source and any linked objects).
    */
@@ -262,6 +270,7 @@ public final class ScenarioContext {
             rootResolverFactory,
             new ScenarioObjectTypeConfigProvider(
                 mapper, raw.get(OBJECT_TYPE_KEY), raw.get(OBJECT_TYPES_KEY)),
+            new ScenarioGlobalConfigProvider(mapper, raw.get(GLOBAL_KEY)),
             new PublisherPorts(resourceState, publishedLinks, regeneration)));
     modules.add(binder -> binder.bind(ScenarioFixture.class).toInstance(fixture));
     modules.addAll(ExtensionModules.of(packages));
