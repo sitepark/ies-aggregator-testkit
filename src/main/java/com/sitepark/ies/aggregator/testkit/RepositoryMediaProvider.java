@@ -23,7 +23,8 @@ import org.jspecify.annotations.Nullable;
  * the given resolver.
  *
  * <p>The block carries the binary asset facts (mime type, dimensions, an optional {@code
- * colorSwatch}, ...) and a nested {@code metadata} object (copyright, alternative text, ...) — the
+ * colorSwatch}, ...) and a nested {@code metadata} object (copyright, alternative text, an optional
+ * {@code digitalSourceType} of an image, ...) — the
  * same nesting as the legacy {@code binary.media} path. Only {@link Image} media is supported for
  * now, which is all the art-direction scenarios need. A missing {@code media} block yields {@link
  * Optional#empty()}, simulating a link that resolves to no media.
@@ -53,7 +54,8 @@ final class RepositoryMediaProvider implements MediaProvider {
             nullableString(metadata, "title"),
             nullableString(metadata, "description"),
             null,
-            focalPoint(metadata.resolve("focalpoint")));
+            focalPoint(metadata.resolve("focalpoint")),
+            nullableString(metadata, "digitalSourceType"));
 
     return Optional.of(
         new Image(
