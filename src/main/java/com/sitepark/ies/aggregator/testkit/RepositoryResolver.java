@@ -255,6 +255,31 @@ final class RepositoryResolver implements GroupResolver {
   }
 
   /**
+   * Follows every link of a field that names groups, written like {@link #resolveLinks(String)}
+   * writes several links. Only a group entry is followed, as {@link #resolveGroupLink(String)}
+   * follows one; anything else is left out.
+   */
+  @Override
+  public List<GroupResolver> resolveGroupLinks(String key) {
+    Object value = this.linkValue(key);
+    List<?> targets =
+        value instanceof List<?> list ? list : value == null ? List.of() : List.of(value);
+    List<GroupResolver> linked = new ArrayList<>();
+    for (Object target : targets) {
+      if (!this.repository.namesAGroup(target)) {
+        continue;
+      }
+      Resolver resolver =
+          this.resolverPath.descend(
+              key, (path) -> this.repository.toResolver(path, target, this.keyOfChild(key)));
+      if (resolver instanceof GroupResolver group && !group.isEmpty()) {
+        linked.add(group);
+      }
+    }
+    return List.copyOf(linked);
+  }
+
+  /**
    * Follows a link field that names a group - a scenario writes it like any link, as the id of a
    * group entry or wrapped under {@code "link"}. Only a group entry is followed, as production
    * follows the link through its pool loader; anything else answers the empty group.
