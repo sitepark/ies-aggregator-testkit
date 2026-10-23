@@ -1,5 +1,6 @@
 package com.sitepark.ies.aggregator.testkit;
 
+import com.sitepark.ies.aggregator.resolver.EntityResolver;
 import com.sitepark.ies.aggregator.resolver.Resolver;
 import com.sitepark.ies.aggregator.resolver.ResolverPath;
 import java.util.ArrayList;
@@ -7,6 +8,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -41,6 +43,9 @@ final class Repository {
 
   /** Structural block holding an entry's group data; its presence marks the entry as a group. */
   private static final String GROUP_KEY = "group";
+
+  /** Structural field holding an entry's object type. */
+  private static final String OBJECT_TYPE_KEY = "objectType";
 
   /** Structural block holding an entry's media asset; its presence marks the entry as a medium. */
   private static final String MEDIA_KEY = "media";
@@ -286,6 +291,30 @@ final class Repository {
     }
     return (RepositoryResolver)
         ResolverPath.createRoot(path -> new RepositoryResolver(path, asObjectMap(entry), this));
+  }
+
+  /**
+   * Returns a fresh root resolver for every entry that is no group and whose object type is
+   * one of the given types, in the order the scenario lists them.
+   *
+   * @param objectTypes the object types to collect
+   * @return the matching entries, each its own root
+   */
+  List<EntityResolver> entitiesOfTypes(Set<String> objectTypes) {
+    List<EntityResolver> found = new ArrayList<>();
+    this.entries.forEach(
+        (id, entry) -> {
+          if (!(entry instanceof Map) || this.isGroupEntry(id)) {
+            return;
+          }
+          Map<String, Object> node = asObjectMap(entry);
+          if (node.get(OBJECT_TYPE_KEY) instanceof String type && objectTypes.contains(type)) {
+            found.add(
+                (EntityResolver)
+                    ResolverPath.createRoot(path -> new RepositoryResolver(path, node, this)));
+          }
+        });
+    return List.copyOf(found);
   }
 
   /**

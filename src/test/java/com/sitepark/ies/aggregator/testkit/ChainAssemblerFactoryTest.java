@@ -10,6 +10,7 @@ import com.sitepark.ies.aggregator.port.AssemblerFactory;
 import com.sitepark.ies.aggregator.port.Channel;
 import com.sitepark.ies.aggregator.port.ChannelProvider;
 import com.sitepark.ies.aggregator.port.GlobalConfigProvider;
+import com.sitepark.ies.aggregator.port.HomepageProvider;
 import com.sitepark.ies.aggregator.port.MediaProvider;
 import com.sitepark.ies.aggregator.port.ObjectTypeConfigProvider;
 import com.sitepark.ies.aggregator.port.VariantConfigProvider;
@@ -47,8 +48,10 @@ class ChainAssemblerFactoryTest {
                 channelProvider(),
                 mock(VariantConfigProvider.class),
                 mock(RootResolverFactory.class),
-                mock(ObjectTypeConfigProvider.class),
-                mock(GlobalConfigProvider.class),
+                new InstallationPorts(
+                    mock(ObjectTypeConfigProvider.class),
+                    mock(GlobalConfigProvider.class),
+                    mock(HomepageProvider.class)),
                 new PublisherPorts(
                     new ScenarioResourceState(),
                     new ScenarioPublishedLinks(),

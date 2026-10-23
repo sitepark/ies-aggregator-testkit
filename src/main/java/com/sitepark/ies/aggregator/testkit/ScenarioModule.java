@@ -10,6 +10,7 @@ import com.sitepark.ies.aggregator.port.AssemblerFactory;
 import com.sitepark.ies.aggregator.port.Channel;
 import com.sitepark.ies.aggregator.port.ChannelProvider;
 import com.sitepark.ies.aggregator.port.GlobalConfigProvider;
+import com.sitepark.ies.aggregator.port.HomepageProvider;
 import com.sitepark.ies.aggregator.port.ImageScaler;
 import com.sitepark.ies.aggregator.port.MediaProvider;
 import com.sitepark.ies.aggregator.port.ObjectTypeConfigProvider;
@@ -60,8 +61,7 @@ final class ScenarioModule implements Module {
   private final ChannelProvider channelProvider;
   private final VariantConfigProvider variantConfigProvider;
   private final RootResolverFactory rootResolverFactory;
-  private final ObjectTypeConfigProvider objectTypeConfigProvider;
-  private final GlobalConfigProvider globalConfigProvider;
+  private final InstallationPorts installationPorts;
   private final PublisherPorts publisherPorts;
 
   ScenarioModule(
@@ -71,8 +71,7 @@ final class ScenarioModule implements Module {
       ChannelProvider channelProvider,
       VariantConfigProvider variantConfigProvider,
       RootResolverFactory rootResolverFactory,
-      ObjectTypeConfigProvider objectTypeConfigProvider,
-      GlobalConfigProvider globalConfigProvider,
+      InstallationPorts installationPorts,
       PublisherPorts publisherPorts) {
     this.assemblerPackages = assemblerPackages;
     this.mediaProvider = mediaProvider;
@@ -80,8 +79,7 @@ final class ScenarioModule implements Module {
     this.channelProvider = channelProvider;
     this.variantConfigProvider = variantConfigProvider;
     this.rootResolverFactory = rootResolverFactory;
-    this.objectTypeConfigProvider = objectTypeConfigProvider;
-    this.globalConfigProvider = globalConfigProvider;
+    this.installationPorts = installationPorts;
     this.publisherPorts = publisherPorts;
   }
 
@@ -98,8 +96,13 @@ final class ScenarioModule implements Module {
     binder.bind(Channel.class).toInstance(this.channelProvider.current());
     binder.bind(VariantConfigProvider.class).toInstance(this.variantConfigProvider);
     binder.bind(RootResolverFactory.class).toInstance(this.rootResolverFactory);
-    binder.bind(ObjectTypeConfigProvider.class).toInstance(this.objectTypeConfigProvider);
-    binder.bind(GlobalConfigProvider.class).toInstance(this.globalConfigProvider);
+    binder
+        .bind(ObjectTypeConfigProvider.class)
+        .toInstance(this.installationPorts.objectTypeConfigProvider());
+    binder
+        .bind(GlobalConfigProvider.class)
+        .toInstance(this.installationPorts.globalConfigProvider());
+    binder.bind(HomepageProvider.class).toInstance(this.installationPorts.homepageProvider());
     binder.bind(ResourceState.class).toInstance(this.publisherPorts.resourceState());
     binder.bind(PublishedLinks.class).toInstance(this.publisherPorts.publishedLinks());
     binder.bind(Regeneration.class).toInstance(this.publisherPorts.regeneration());

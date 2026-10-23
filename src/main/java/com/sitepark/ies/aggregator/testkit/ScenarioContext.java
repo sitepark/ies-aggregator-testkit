@@ -268,9 +268,11 @@ public final class ScenarioContext {
             channelProvider,
             new ScenarioVariantConfigProvider(mapper, raw.get(VARIANT_CONFIG_KEY)),
             rootResolverFactory,
-            new ScenarioObjectTypeConfigProvider(
-                mapper, raw.get(OBJECT_TYPE_KEY), raw.get(OBJECT_TYPES_KEY)),
-            new ScenarioGlobalConfigProvider(mapper, raw.get(GLOBAL_KEY)),
+            new InstallationPorts(
+                new ScenarioObjectTypeConfigProvider(
+                    mapper, raw.get(OBJECT_TYPE_KEY), raw.get(OBJECT_TYPES_KEY)),
+                new ScenarioGlobalConfigProvider(mapper, raw.get(GLOBAL_KEY)),
+                new ScenarioHomepageProvider(repository, raw.get(OBJECT_TYPES_KEY))),
             new PublisherPorts(resourceState, publishedLinks, regeneration)));
     modules.add(binder -> binder.bind(ScenarioFixture.class).toInstance(fixture));
     modules.addAll(ExtensionModules.of(packages));
