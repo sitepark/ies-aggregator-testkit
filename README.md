@@ -114,7 +114,7 @@ extends: their constructors are package-private, as production never calls them 
 | `options` | the aggregator's configured options, bound with `context.options(Class)` |
 | `access` | the access restriction the channel reports for the resource |
 | `objectType` | the configuration of the resource's object type at its place (`configuration(objectId, type)`) |
-| `objectTypes` | the global definitions, a map `type name -> config` (`typeConfiguration(type, class)`); shares no data with `objectType`, an unnamed type answers empty |
+| `objectTypes` | the global definitions, a map `type name -> config` (`typeConfiguration(type, class)`); shares no data with `objectType`, an unnamed type answers empty; the types it marks `"home": true` decide which repository entries `HomepageProvider.homepages()` answers |
 | `global` | the installation's global configuration, a map `entry name -> config` (`GlobalConfigProvider.configuration(name, type)`, SPML `system.config.global.<name>`); an unnamed entry or an absent block answers empty, so an unconfigured feature is off |
 | `variantConfig` | the image-variant catalog of the project configuration |
 
@@ -132,7 +132,7 @@ The entry `1000` is the source the aggregation starts from (`ScenarioContext.SOU
 | `MediaProvider` | `RepositoryMediaProvider` — from the entry's `media` block; an image may carry `media.metadata.digitalSourceType` (IPTC term or URI), `null` when absent |
 | `ChannelProvider`, `Channel` | `ScenarioChannel` — deterministic URLs, answers only what a publication would |
 | `ImageScaler` | `ScenarioImageScaler` — sizes and URLs derived from the request, no pixels |
-| `ObjectTypeConfigProvider`, `GlobalConfigProvider`, `VariantConfigProvider`, `StructuredValueParser` | read from the scenario blocks |
+| `ObjectTypeConfigProvider`, `GlobalConfigProvider`, `HomepageProvider`, `VariantConfigProvider`, `StructuredValueParser` | read from the scenario blocks |
 | `AssemblerFactory` | `ScenarioAssemblerFactory` — ClassGraph finds `@AssemblerBinding` classes, the production lookup semantics pick the winner, Guice builds it |
 | `AggregatorErrorHandler` | throws — a scenario is a fixture, an error is a failure |
 | `Clock` | fixed at `2026-09-01T12:00:00Z` |
