@@ -295,6 +295,25 @@ final class RepositoryResolver implements GroupResolver {
     return List.copyOf(referrers);
   }
 
+  /**
+   * The id the link field stores for its first target, as written - the target need not be an
+   * entry of the repository, as a pool of the user repository is not. Production reads the id from
+   * the field without loading the target, so the scenario writes it in the qualified form the
+   * aggregator is meant to see; the testkit does not translate it. An id reference ({@code $ref})
+   * answers the id it references. A field that holds no id - absent, empty, an inline object -
+   * answers the empty string.
+   */
+  @Override
+  public String linkTargetId(String key) {
+    Object value = this.linkValue(key);
+    Object first =
+        value instanceof List<?> list ? (list.isEmpty() ? null : list.getFirst()) : value;
+    if (first instanceof String id) {
+      return id;
+    }
+    return first instanceof Map<?, ?> node && node.get("$ref") instanceof String refId ? refId : "";
+  }
+
   /** The raw value of a link field, unwrapped from its {@code "link"} key if it has one. */
   private @Nullable Object linkValue(String key) {
     Object value = this.field(key);
