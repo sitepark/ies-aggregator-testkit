@@ -12,6 +12,7 @@ import com.sitepark.ies.aggregator.Aggregator;
 import com.sitepark.ies.aggregator.Options;
 import com.sitepark.ies.aggregator.OptionsAware;
 import com.sitepark.ies.aggregator.RootAggregator;
+import com.sitepark.ies.aggregator.SectionTypeAware;
 import com.sitepark.ies.aggregator.output.Component;
 import com.sitepark.ies.aggregator.output.DomainObjectMapper;
 import com.sitepark.ies.aggregator.output.OutputList;
@@ -77,6 +78,15 @@ public final class ScenarioContext {
    * options via {@link #options(Class)}.
    */
   public static final String OPTIONS_KEY = "options";
+
+  /**
+   * Top-level key in a scenario file naming the section type the aggregator under test serves, a
+   * non-blank string such as {@code "notification"}. It is what the production {@code
+   * AggregatorFactory} takes from the section type's configuration and hands to a {@link
+   * SectionTypeAware} aggregator. It is required by such an aggregator and never defaulted: a
+   * scenario without it fails when the aggregator is built.
+   */
+  public static final String SECTION_TYPE_KEY = "sectionType";
 
   /**
    * Top-level key in a scenario file carrying the access restriction the channel reports for the
@@ -155,6 +165,7 @@ public final class ScenarioContext {
   private final ChannelProvider channelProvider;
   private final ObjectMapper jsonMapper;
   private final @Nullable Object rawOptions;
+  private final @Nullable Object rawSectionType;
   private final ScenarioResourceState resourceState;
   private final ScenarioPublishedLinks publishedLinks;
   private final ScenarioRegeneration regeneration;
@@ -174,6 +185,7 @@ public final class ScenarioContext {
       ChannelProvider channelProvider,
       ObjectMapper jsonMapper,
       @Nullable Object rawOptions,
+      @Nullable Object rawSectionType,
       ScenarioResourceState resourceState,
       ScenarioPublishedLinks publishedLinks,
       ScenarioRegeneration regeneration,
@@ -186,6 +198,7 @@ public final class ScenarioContext {
     this.channelProvider = channelProvider;
     this.jsonMapper = jsonMapper;
     this.rawOptions = rawOptions;
+    this.rawSectionType = rawSectionType;
     this.resourceState = resourceState;
     this.publishedLinks = publishedLinks;
     this.regeneration = regeneration;
@@ -287,6 +300,7 @@ public final class ScenarioContext {
         channelProvider,
         mapper,
         rawOptions,
+        raw.get(SECTION_TYPE_KEY),
         resourceState,
         publishedLinks,
         regeneration,
@@ -331,7 +345,8 @@ public final class ScenarioContext {
    * <p>This is how a project reaches an aggregator of a library it extends - their constructors are
    * package-private on purpose, as production never calls them either. An aggregator that declares
    * {@link OptionsAware} is handed the scenario's options as well, again as production does it, so
-   * a test never sets them by hand.
+   * a test never sets them by hand. One that declares {@link SectionTypeAware} is handed the
+   * scenario's {@link #SECTION_TYPE_KEY}, and fails to build without it.
    *
    * @param type the aggregator class
    * @param <T> the aggregator type
@@ -341,7 +356,28 @@ public final class ScenarioContext {
     if (aggregator instanceof OptionsAware<?> optionsAware) {
       this.setOptions(optionsAware);
     }
+    if (aggregator instanceof SectionTypeAware sectionTypeAware) {
+      sectionTypeAware.setSectionType(this.sectionType(type));
+    }
     return aggregator;
+  }
+
+  /**
+   * The section type id the scenario names. Production hands a {@link SectionTypeAware} aggregator
+   * the id from the section type's configuration, which is never empty; the harness has no such
+   * configuration, so the scenario has to name it, and an id the scenario leaves out is not made
+   * up.
+   */
+  private String sectionType(Class<?> aggregatorType) {
+    if (this.rawSectionType instanceof String id && !id.isBlank()) {
+      return id;
+    }
+    throw new IllegalStateException(
+        aggregatorType.getName()
+            + " is SectionTypeAware, so the scenario must name its section type under '"
+            + SECTION_TYPE_KEY
+            + "' as a non-blank string, but it has: "
+            + this.rawSectionType);
   }
 
   /**

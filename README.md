@@ -90,7 +90,7 @@ still there on their own: `Scenarios.discover(dirs)`, `ScenarioContext.load(reso
 
 `context.aggregator(Class)` builds the aggregator under test the way the production container does —
 from its `@Inject` constructor, with the harness's ports injected, and, if it is `OptionsAware`, with
-the options of the scenario set. That is also how a project reaches the aggregators of a library it
+the options of the scenario set and, if it is `SectionTypeAware`, with the scenario's `sectionType`. That is also how a project reaches the aggregators of a library it
 extends: their constructors are package-private, as production never calls them either.
 
 ## A scenario file
@@ -116,6 +116,7 @@ extends: their constructors are package-private, as production never calls them 
 | `objectType` | the configuration of the resource's object type at its place (`configuration(objectId, type)`) |
 | `objectTypes` | the global definitions, a map `type name -> config` (`typeConfiguration(type, class)`); shares no data with `objectType`, an unnamed type answers empty; the types it marks `"home": true` decide which repository entries `HomepageProvider.homepages()` answers. `CategoryRootProvider.categoryRoots()` answers every `category` entry whose `sp_parent_category` holds no link, published or not |
 | `global` | the installation's global configuration, a map `entry name -> config` (`GlobalConfigProvider.configuration(name, type)`, SPML `system.config.global.<name>`); an unnamed entry or an absent block answers empty, so an unconfigured feature is off |
+| `sectionType` | the id of the section type the aggregator serves, a non-blank string; `context.aggregator(Class)` hands it to an aggregator that is `SectionTypeAware`, as the production factory does from the configuration, and fails to build one when the scenario names none - nothing is defaulted |
 | `variantConfig` | the image-variant catalog of the project configuration |
 
 An entry may carry `"archive": true`; its entity descriptor then answers `isArchive()` with `true`.
