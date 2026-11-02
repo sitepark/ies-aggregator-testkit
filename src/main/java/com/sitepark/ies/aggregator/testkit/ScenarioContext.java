@@ -89,6 +89,14 @@ public final class ScenarioContext {
   public static final String SECTION_TYPE_KEY = "sectionType";
 
   /**
+   * Top-level key in a scenario file carrying the user groups of the IES user repository: a map
+   * {@code anchor -> {"qualifiedId": "...", "members": [{"email": ["a@x", ...]}, ...]}}, what
+   * {@code ContentNotificationRecipientProvider.recipients} answers. A group the block does not
+   * name, or an absent block, answers empty.
+   */
+  public static final String USER_GROUPS_KEY = "userGroups";
+
+  /**
    * Top-level key in a scenario file carrying the access restriction the channel reports for the
    * resource: {@code {"mode": "ALLOW"|"DENY", "groups": [...]}}. An absent block means the resource
    * is unrestricted.
@@ -286,7 +294,8 @@ public final class ScenarioContext {
                     mapper, raw.get(OBJECT_TYPE_KEY), raw.get(OBJECT_TYPES_KEY)),
                 new ScenarioGlobalConfigProvider(mapper, raw.get(GLOBAL_KEY)),
                 new ScenarioHomepageProvider(repository, raw.get(OBJECT_TYPES_KEY)),
-                new ScenarioCategoryRootProvider(repository)),
+                new ScenarioCategoryRootProvider(repository),
+                new ScenarioContentNotificationRecipientProvider(mapper, raw.get(USER_GROUPS_KEY))),
             new PublisherPorts(resourceState, publishedLinks, regeneration)));
     modules.add(binder -> binder.bind(ScenarioFixture.class).toInstance(fixture));
     modules.addAll(ExtensionModules.of(packages));

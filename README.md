@@ -117,6 +117,7 @@ extends: their constructors are package-private, as production never calls them 
 | `objectTypes` | the global definitions, a map `type name -> config` (`typeConfiguration(type, class)`); shares no data with `objectType`, an unnamed type answers empty; the types it marks `"home": true` decide which repository entries `HomepageProvider.homepages()` answers. `CategoryRootProvider.categoryRoots()` answers every `category` entry whose `sp_parent_category` holds no link, published or not |
 | `global` | the installation's global configuration, a map `entry name -> config` (`GlobalConfigProvider.configuration(name, type)`, SPML `system.config.global.<name>`); an unnamed entry or an absent block answers empty, so an unconfigured feature is off |
 | `sectionType` | the id of the section type the aggregator serves, a non-blank string; `context.aggregator(Class)` hands it to an aggregator that is `SectionTypeAware`, as the production factory does from the configuration, and fails to build one when the scenario names none - nothing is defaulted |
+| `userGroups` | the user groups of the IES user repository, a map `anchor -> {"qualifiedId": "…", "members": [{"email": ["a@x", …]}, …]}` (`ContentNotificationRecipientProvider.recipients(anchor)`); an unnamed anchor answers empty; each direct member contributes its first address, trimmed, skipped when blank or absent; no de-duplication, as in production |
 | `variantConfig` | the image-variant catalog of the project configuration |
 
 An entry may carry `"archive": true`; its entity descriptor then answers `isArchive()` with `true`.
@@ -133,7 +134,7 @@ The entry `1000` is the source the aggregation starts from (`ScenarioContext.SOU
 | `MediaProvider` | `RepositoryMediaProvider` — from the entry's `media` block; an image may carry `media.metadata.digitalSourceType` (IPTC term or URI), `null` when absent |
 | `ChannelProvider`, `Channel` | `ScenarioChannel` — deterministic URLs, answers only what a publication would |
 | `ImageScaler` | `ScenarioImageScaler` — sizes and URLs derived from the request, no pixels |
-| `ObjectTypeConfigProvider`, `GlobalConfigProvider`, `HomepageProvider`, `CategoryRootProvider`, `VariantConfigProvider`, `StructuredValueParser` | read from the scenario blocks |
+| `ObjectTypeConfigProvider`, `GlobalConfigProvider`, `HomepageProvider`, `CategoryRootProvider`, `ContentNotificationRecipientProvider`, `VariantConfigProvider`, `StructuredValueParser` | read from the scenario blocks |
 | `AssemblerFactory` | `ScenarioAssemblerFactory` — ClassGraph finds `@AssemblerBinding` classes, the production lookup semantics pick the winner, Guice builds it |
 | `AggregatorErrorHandler` | throws — a scenario is a fixture, an error is a failure |
 | `Clock` | fixed at `2026-09-01T12:00:00Z` |

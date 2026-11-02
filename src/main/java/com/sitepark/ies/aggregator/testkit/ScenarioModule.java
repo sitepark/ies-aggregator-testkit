@@ -10,6 +10,7 @@ import com.sitepark.ies.aggregator.port.AssemblerFactory;
 import com.sitepark.ies.aggregator.port.CategoryRootProvider;
 import com.sitepark.ies.aggregator.port.Channel;
 import com.sitepark.ies.aggregator.port.ChannelProvider;
+import com.sitepark.ies.aggregator.port.ContentNotificationRecipientProvider;
 import com.sitepark.ies.aggregator.port.GlobalConfigProvider;
 import com.sitepark.ies.aggregator.port.HomepageProvider;
 import com.sitepark.ies.aggregator.port.ImageScaler;
@@ -107,6 +108,9 @@ final class ScenarioModule implements Module {
     binder
         .bind(CategoryRootProvider.class)
         .toInstance(this.installationPorts.categoryRootProvider());
+    binder
+        .bind(ContentNotificationRecipientProvider.class)
+        .toInstance(this.installationPorts.contentNotificationRecipientProvider());
     binder.bind(ResourceState.class).toInstance(this.publisherPorts.resourceState());
     binder.bind(PublishedLinks.class).toInstance(this.publisherPorts.publishedLinks());
     binder.bind(Regeneration.class).toInstance(this.publisherPorts.regeneration());
