@@ -15,6 +15,7 @@ import com.sitepark.ies.aggregator.value.media.ImageMetadata;
 import com.sitepark.ies.aggregator.value.media.Media;
 import com.sitepark.ies.aggregator.value.media.Origin;
 import com.sitepark.ies.aggregator.value.media.UnclassifiedMedia;
+import java.time.Instant;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
@@ -24,9 +25,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The block carries the binary asset facts (mime type, dimensions, an optional {@code
  * colorSwatch}, ...) and a nested {@code metadata} object (copyright, alternative text, an optional
- * {@code digitalSourceType} of an image, ...) — the
- * same nesting as the legacy {@code binary.media} path. Only {@link Image} media is supported for
- * now, which is all the art-direction scenarios need. A missing {@code media} block yields {@link
+ * {@code digitalSourceType} of an image, an optional {@code lastModified} in epoch milliseconds, ...)
+ * — the same nesting as the legacy {@code binary.media} path. The {@code kind} is {@code image}
+ * (default), {@code document} or {@code unclassified}. A missing {@code media} block yields {@link
  * Optional#empty()}, simulating a link that resolves to no media.
  *
  * <p>The asset's object id is taken from the resolver's scope root, mirroring production: for an
@@ -53,7 +54,7 @@ final class RepositoryMediaProvider implements MediaProvider {
             nullableString(metadata, "copyright"),
             nullableString(metadata, "title"),
             nullableString(metadata, "description"),
-            null,
+            lastModified(metadata),
             focalPoint(metadata.resolve("focalpoint")),
             nullableString(metadata, "digitalSourceType"));
 
@@ -87,7 +88,7 @@ final class RepositoryMediaProvider implements MediaProvider {
             nullableString(metadata, "copyright"),
             nullableString(metadata, "title"),
             nullableString(metadata, "description"),
-            null);
+            lastModified(metadata));
     int objectId = objectId(resolver);
     int id = media.value("id").asInt(0);
     String filename = media.value("filename").asString("");
@@ -127,6 +128,16 @@ final class RepositoryMediaProvider implements MediaProvider {
   /** The id of the object the media belongs to, or {@code 0} if the scope root is not an entity. */
   private static int objectId(Resolver resolver) {
     return resolver.root() instanceof EntityResolver entity ? entity.entity().id() : 0;
+  }
+
+  /**
+   * The modification time of {@code media.metadata.lastModified}, given as epoch milliseconds - the
+   * unit the store keeps it in - or {@code null} if the fixture names none, as for an asset without
+   * a modification time.
+   */
+  private static @Nullable Instant lastModified(Resolver metadata) {
+    ResolvedValue value = metadata.value("lastModified");
+    return value.isEmpty() ? null : Instant.ofEpochMilli(value.asLong(0L));
   }
 
   private static @Nullable String nullableString(Resolver resolver, String key) {
