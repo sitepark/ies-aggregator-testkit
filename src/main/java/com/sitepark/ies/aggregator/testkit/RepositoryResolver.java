@@ -327,14 +327,19 @@ final class RepositoryResolver implements GroupResolver {
    * aggregator is meant to see; the testkit does not translate it. An id reference ({@code $ref})
    * answers the id it references. A field that holds no id - absent, empty, an inline object -
    * answers the empty string.
+   *
+   * <p>A bare string is a link only where it names an entry, as for {@link #resolveLink(String)};
+   * anything else is the text of a plain field, for which production answers the empty string. A
+   * target outside the scenario is written under the {@code "link"} key.
    */
   @Override
   public String linkTargetId(String key) {
+    boolean wrapped = this.field(key) instanceof Map<?, ?> map && map.get(LINK_KEY) != null;
     Object value = this.linkValue(key);
     Object first =
         value instanceof List<?> list ? (list.isEmpty() ? null : list.getFirst()) : value;
     if (first instanceof String id) {
-      return id;
+      return wrapped || this.repository.namesAnEntry(id) ? id : "";
     }
     return first instanceof Map<?, ?> node && node.get("$ref") instanceof String refId ? refId : "";
   }

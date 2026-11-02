@@ -31,8 +31,15 @@ class RepositoryResolverLinkTargetIdTest {
   }
 
   @Test
-  void answersABareIdReference() {
-    assertThat(linkTargetId("100560100000001500")).isEqualTo("100560100000001500");
+  void answersABareIdReferenceThatNamesAnEntry() {
+    assertThat(linkTargetId("1")).isEqualTo("1");
+  }
+
+  @Test
+  void answersEmptyForPlainTextAsProductionDoesForATextField() {
+    assertThat(linkTargetId("100560100000001500"))
+        .as("a bare string naming no entry is the text of a plain field, not a link")
+        .isEmpty();
   }
 
   @Test
