@@ -47,6 +47,12 @@ final class Repository {
   /** Structural field holding an entry's object type. */
   private static final String OBJECT_TYPE_KEY = "objectType";
 
+  /** Object type of a category. */
+  private static final String CATEGORY_TYPE = "category";
+
+  /** Field linking a category to its parent category. */
+  private static final String PARENT_CATEGORY_FIELD = "sp_parent_category";
+
   /** Structural block holding an entry's media asset; its presence marks the entry as a medium. */
   private static final String MEDIA_KEY = "media";
 
@@ -314,6 +320,23 @@ final class Repository {
                     ResolverPath.createRoot(path -> new RepositoryResolver(path, node, this)));
           }
         });
+    return List.copyOf(found);
+  }
+
+  /**
+   * Returns a fresh root resolver for every category entry whose {@code sp_parent_category} holds no
+   * link, in the order the scenario lists them. Production asks the store for the link, not for its
+   * target, so a link to an object the scenario does not contain still makes a category a child.
+   *
+   * @return the category roots, each its own root
+   */
+  List<EntityResolver> categoryRoots() {
+    List<EntityResolver> found = new ArrayList<>();
+    for (EntityResolver category : this.entitiesOfTypes(Set.of(CATEGORY_TYPE))) {
+      if (category.linkTargetId(PARENT_CATEGORY_FIELD).isEmpty()) {
+        found.add(category);
+      }
+    }
     return List.copyOf(found);
   }
 

@@ -272,7 +272,8 @@ public final class ScenarioContext {
                 new ScenarioObjectTypeConfigProvider(
                     mapper, raw.get(OBJECT_TYPE_KEY), raw.get(OBJECT_TYPES_KEY)),
                 new ScenarioGlobalConfigProvider(mapper, raw.get(GLOBAL_KEY)),
-                new ScenarioHomepageProvider(repository, raw.get(OBJECT_TYPES_KEY))),
+                new ScenarioHomepageProvider(repository, raw.get(OBJECT_TYPES_KEY)),
+                new ScenarioCategoryRootProvider(repository)),
             new PublisherPorts(resourceState, publishedLinks, regeneration)));
     modules.add(binder -> binder.bind(ScenarioFixture.class).toInstance(fixture));
     modules.addAll(ExtensionModules.of(packages));

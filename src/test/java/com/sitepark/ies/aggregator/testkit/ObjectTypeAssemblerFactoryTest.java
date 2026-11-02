@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import com.google.inject.Guice;
 import com.sitepark.ies.aggregator.port.AssemblerChain;
 import com.sitepark.ies.aggregator.port.AssemblerFactory;
+import com.sitepark.ies.aggregator.port.CategoryRootProvider;
 import com.sitepark.ies.aggregator.port.Channel;
 import com.sitepark.ies.aggregator.port.ChannelProvider;
 import com.sitepark.ies.aggregator.port.GlobalConfigProvider;
@@ -55,7 +56,8 @@ class ObjectTypeAssemblerFactoryTest {
                 new InstallationPorts(
                     mock(ObjectTypeConfigProvider.class),
                     mock(GlobalConfigProvider.class),
-                    mock(HomepageProvider.class)),
+                    mock(HomepageProvider.class),
+                    mock(CategoryRootProvider.class)),
                 new PublisherPorts(
                     new ScenarioResourceState(),
                     new ScenarioPublishedLinks(),

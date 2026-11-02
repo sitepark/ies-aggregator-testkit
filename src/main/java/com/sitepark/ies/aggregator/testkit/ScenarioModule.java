@@ -7,6 +7,7 @@ import com.sitepark.ies.aggregator.AggregatorErrorHandler;
 import com.sitepark.ies.aggregator.AggregatorException;
 import com.sitepark.ies.aggregator.output.DomainObjectMapper;
 import com.sitepark.ies.aggregator.port.AssemblerFactory;
+import com.sitepark.ies.aggregator.port.CategoryRootProvider;
 import com.sitepark.ies.aggregator.port.Channel;
 import com.sitepark.ies.aggregator.port.ChannelProvider;
 import com.sitepark.ies.aggregator.port.GlobalConfigProvider;
@@ -103,6 +104,9 @@ final class ScenarioModule implements Module {
         .bind(GlobalConfigProvider.class)
         .toInstance(this.installationPorts.globalConfigProvider());
     binder.bind(HomepageProvider.class).toInstance(this.installationPorts.homepageProvider());
+    binder
+        .bind(CategoryRootProvider.class)
+        .toInstance(this.installationPorts.categoryRootProvider());
     binder.bind(ResourceState.class).toInstance(this.publisherPorts.resourceState());
     binder.bind(PublishedLinks.class).toInstance(this.publisherPorts.publishedLinks());
     binder.bind(Regeneration.class).toInstance(this.publisherPorts.regeneration());
