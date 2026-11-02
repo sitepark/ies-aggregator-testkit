@@ -15,6 +15,7 @@ import com.sitepark.ies.aggregator.value.media.ImageMetadata;
 import com.sitepark.ies.aggregator.value.media.Media;
 import com.sitepark.ies.aggregator.value.media.Origin;
 import com.sitepark.ies.aggregator.value.media.UnclassifiedMedia;
+import com.sitepark.ies.aggregator.value.media.Video;
 import java.time.Instant;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
@@ -27,7 +28,7 @@ import org.jspecify.annotations.Nullable;
  * colorSwatch}, ...) and a nested {@code metadata} object (copyright, alternative text, an optional
  * {@code digitalSourceType} of an image, an optional {@code lastModified} in epoch milliseconds, ...)
  * — the same nesting as the legacy {@code binary.media} path. The {@code kind} is {@code image}
- * (default), {@code document} or {@code unclassified}. A missing {@code media} block yields {@link
+ * (default), {@code document}, {@code video} or {@code unclassified}. A missing {@code media} block yields {@link
  * Optional#empty()}, simulating a link that resolves to no media.
  *
  * <p>The asset's object id is taken from the resolver's scope root, mirroring production: for an
@@ -79,7 +80,8 @@ final class RepositoryMediaProvider implements MediaProvider {
    *
    * <p>{@code unclassified} is the one the store itself cannot sort — a PostScript file, say. It
    * carries no kind-specific data, and a scenario needs it to show that a download link is built
-   * from the shared fields alone.
+   * from the shared fields alone. A {@code video} carries {@code width} and {@code height} like an
+   * image, {@code 0} where absent - the model's value for a video the store never analysed.
    */
   private static Media nonImage(String kind, Resolver resolver, Resolver media, Resolver metadata) {
     GenericMetadata genericMetadata =
@@ -110,6 +112,19 @@ final class RepositoryMediaProvider implements MediaProvider {
               genericMetadata,
               mediaOrigin,
               nullableString(media, "extractedContent"));
+      case "video" ->
+          new Video(
+              objectId,
+              id,
+              filename,
+              originFilename,
+              mimeType,
+              fileSize,
+              hash,
+              genericMetadata,
+              mediaOrigin,
+              media.value("width").asInt(0),
+              media.value("height").asInt(0));
       case "unclassified" ->
           new UnclassifiedMedia(
               objectId,

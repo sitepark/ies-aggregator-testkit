@@ -131,7 +131,7 @@ The entry `1000` is the source the aggregation starts from (`ScenarioContext.SOU
 | Port | Double |
 |---|---|
 | `RootResolverFactory`, resolvers | `Repository`, `RepositoryResolver` — navigation across links, groups, uploads |
-| `MediaProvider` | `RepositoryMediaProvider` — from the entry's `media` block; an image may carry `media.metadata.digitalSourceType` (IPTC term or URI), `null` when absent; `media.metadata.lastModified` (epoch milliseconds, `null` when absent) for every kind |
+| `MediaProvider` | `RepositoryMediaProvider` — from the entry's `media` block; an image may carry `media.metadata.digitalSourceType` (IPTC term or URI), `null` when absent; `media.metadata.lastModified` (epoch milliseconds, `null` when absent) for every kind; `media.kind: video` with `width`/`height` (`0` when absent) |
 | `ChannelProvider`, `Channel` | `ScenarioChannel` — deterministic URLs, answers only what a publication would |
 | `ImageScaler` | `ScenarioImageScaler` — sizes and URLs derived from the request, no pixels |
 | `ObjectTypeConfigProvider`, `GlobalConfigProvider`, `HomepageProvider`, `CategoryRootProvider`, `ContentNotificationRecipientProvider`, `VariantConfigProvider`, `StructuredValueParser` | read from the scenario blocks |
