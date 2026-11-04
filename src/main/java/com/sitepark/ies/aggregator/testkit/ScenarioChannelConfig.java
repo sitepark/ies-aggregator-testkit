@@ -23,17 +23,21 @@ import org.jspecify.annotations.Nullable;
  *     ChannelProvider.primary} answers empty, as for an object no pool assigns one
  * @param tenantName the name of the tenant, or {@code null} if the scenario names none - then the
  *     channel answers none, so a fallback to it has to be shown by a scenario that names one
+ * @param url the channel's own URL, or {@code null} if the scenario names none - then the channel
+ *     answers none; there is no default host, since production answers none for a publisher
+ *     without one
  */
 record ScenarioChannelConfig(
     @Nullable String nature,
     Map<String, String> attributes,
     @Nullable UrlLookup urlLookup,
     boolean primaryChannel,
-    @Nullable String tenantName) {
+    @Nullable String tenantName,
+    @Nullable String url) {
 
   /** A channel that declares neither a nature nor a single attribute. */
   static final ScenarioChannelConfig EMPTY =
-      new ScenarioChannelConfig(null, Map.of(), null, false, null);
+      new ScenarioChannelConfig(null, Map.of(), null, false, null, null);
 
   ScenarioChannelConfig {
     attributes = Map.copyOf(attributes);
@@ -46,12 +50,14 @@ record ScenarioChannelConfig(
       @JsonProperty("attributes") @Nullable Map<String, String> attributes,
       @JsonProperty("urlLookup") @Nullable UrlLookup urlLookup,
       @JsonProperty("primaryChannel") @Nullable Boolean primaryChannel,
-      @JsonProperty("tenantName") @Nullable String tenantName) {
+      @JsonProperty("tenantName") @Nullable String tenantName,
+      @JsonProperty("url") @Nullable String url) {
     return new ScenarioChannelConfig(
         nature,
         attributes == null ? Map.of() : attributes,
         urlLookup,
         Boolean.TRUE.equals(primaryChannel),
-        tenantName);
+        tenantName,
+        url);
   }
 }

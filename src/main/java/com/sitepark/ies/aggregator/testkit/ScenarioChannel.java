@@ -5,6 +5,7 @@ import com.sitepark.ies.aggregator.port.UrlLookup;
 import com.sitepark.ies.aggregator.value.AccessRestriction;
 import com.sitepark.ies.aggregator.value.ResourcePathType;
 import com.sitepark.ies.aggregator.value.uri.PlainUri;
+import com.sitepark.ies.aggregator.value.uri.Uri;
 import com.sitepark.ies.aggregator.value.uri.UriTarget;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
@@ -75,6 +76,13 @@ final class ScenarioChannel implements Channel {
   @Override
   public Optional<String> tenantName() {
     return Optional.ofNullable(this.config.tenantName());
+  }
+
+  /** The URL the scenario names for the channel; none unless it names one, as a publisher without. */
+  @Override
+  public Optional<PlainUri> url() {
+    String url = this.config.url();
+    return url == null || url.isBlank() ? Optional.empty() : Optional.of(Uri.of(url));
   }
 
   @Override
