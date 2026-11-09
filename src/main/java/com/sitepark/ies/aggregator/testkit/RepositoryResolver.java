@@ -422,6 +422,17 @@ final class RepositoryResolver implements GroupResolver {
         user.value("lastName").asString(""));
   }
 
+  /**
+   * The elements of a list field - and only of a list field. Production answers none for anything
+   * else: {@code BaseInformationVOResolver.resolveList} returns the empty list unless the field is
+   * a {@code ListInformationVO}, so a field that holds one object ({@code BaseInformationVO}), a
+   * leaf (text, link, ...) or nothing has no elements there. Answering a one-element list for an
+   * object field let a port iterate a field it has to read with {@link #resolve(String)}.
+   *
+   * <p>Only an object element is an item: production keeps just the {@code ListItemInformationVO}
+   * entries of the list and skips every other. An element that is no object is skipped here, and
+   * the elements after it keep the index they have in the list.
+   */
   @Override
   public List<Resolver> resolveList(String key) {
     Object value = this.field(key);
@@ -429,6 +440,9 @@ final class RepositoryResolver implements GroupResolver {
       List<Resolver> resolvers = new ArrayList<>();
       for (int index = 0; index < list.size(); index++) {
         Object element = list.get(index);
+        if (!(element instanceof Map)) {
+          continue;
+        }
         // The position belongs in the key, exactly as it does in production: without it every
         // element of the list would inherit the same one.
         String childKey = this.keyOfChild(key + '[' + index + ']');
@@ -437,11 +451,6 @@ final class RepositoryResolver implements GroupResolver {
                 key, (path) -> this.repository.toResolver(path, element, childKey)));
       }
       return resolvers;
-    }
-    if (value instanceof Map) {
-      return List.of(
-          this.resolverPath.descend(
-              key, (path) -> this.repository.toResolver(path, value, this.keyOfChild(key))));
     }
     return List.of();
   }
