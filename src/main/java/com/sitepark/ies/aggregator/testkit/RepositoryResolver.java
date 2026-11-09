@@ -9,13 +9,17 @@ import com.sitepark.ies.aggregator.resolver.ResolverPath;
 import com.sitepark.ies.aggregator.resolver.Revision;
 import com.sitepark.ies.aggregator.resolver.User;
 import com.sitepark.ies.aggregator.value.ResolvedValue;
+import com.sitepark.ies.aggregator.value.SiteUrlMapping;
+import com.sitepark.ies.aggregator.value.UrlMappingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -55,10 +59,18 @@ import org.jspecify.annotations.Nullable;
  *     "rootSiteGroup": true,
  *     "micrositeRootSiteGroup": false,
  *     "subGroups": ["5100"],
- *     "entities": ["1000", "1330"]
+ *     "entities": ["1000", "1330"],
+ *     "urlMappings": [
+ *       {"path": "/kontakt", "ownerId": "1330", "mode": "FORWARD", "locale": "de_DE"}
+ *     ]
  *   }
  * }
  * }</pre>
+ *
+ * <p>The {@code urlMappings} block lists the mappings the platform would answer for the site, one per
+ * path (the platform keeps only the highest-priority one). {@code path}, {@code ownerId} and {@code
+ * mode} (a {@link UrlMappingMode} constant name) are required, {@code locale} is optional; a block
+ * that breaks this is rejected instead of being repaired. A group without the block has no mappings.
  *
  * <p>An entry without a {@code group} block keeps the neutral defaults (no children, no language, no
  * site-root marker); the presence of the block is also what makes an entry findable as a group by
@@ -652,6 +664,56 @@ final class RepositoryResolver implements GroupResolver {
     @Override
     public String lang() {
       return group().get("lang") instanceof String lang ? lang : "";
+    }
+
+    @Override
+    public List<SiteUrlMapping> urlMappings() {
+      if (group().get("urlMappings") == null) {
+        return List.of();
+      }
+      if (!(group().get("urlMappings") instanceof List<?> entries)) {
+        throw new IllegalArgumentException("urlMappings must be a list");
+      }
+      List<SiteUrlMapping> mappings = new ArrayList<>();
+      Set<String> paths = new HashSet<>();
+      for (Object entry : entries) {
+        SiteUrlMapping mapping = urlMapping(entry);
+        if (!paths.add(mapping.path())) {
+          throw new IllegalArgumentException(
+              "urlMappings names the path " + mapping.path() + " twice");
+        }
+        mappings.add(mapping);
+      }
+      return List.copyOf(mappings);
+    }
+
+    private SiteUrlMapping urlMapping(Object entry) {
+      if (!(entry instanceof Map<?, ?> map)) {
+        throw new IllegalArgumentException("a urlMappings entry must be an object: " + entry);
+      }
+      String path = requiredText(map, "path");
+      String ownerId = requiredText(map, "ownerId");
+      UrlMappingMode mode;
+      try {
+        mode = UrlMappingMode.valueOf(requiredText(map, "mode"));
+      } catch (IllegalArgumentException e) {
+        throw new IllegalArgumentException("unknown mode in urlMappings entry " + map, e);
+      }
+      Object locale = map.get("locale");
+      return new SiteUrlMapping(
+          path,
+          ownerId,
+          mode,
+          locale == null ? null : Locale.forLanguageTag(locale.toString().replace('_', '-')));
+    }
+
+    private String requiredText(Map<?, ?> map, String key) {
+      Object value = map.get(key);
+      if (value == null || value.toString().isEmpty()) {
+        throw new IllegalArgumentException(
+            "a urlMappings entry needs a non-empty " + key + ": " + map);
+      }
+      return value.toString();
     }
 
     /**
