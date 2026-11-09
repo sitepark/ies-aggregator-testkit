@@ -59,7 +59,8 @@ class ChainAssemblerFactoryTest {
                 new PublisherPorts(
                     new ScenarioResourceState(),
                     new ScenarioPublishedLinks(),
-                    new ScenarioRegeneration(ScenarioModule.FIXED_CLOCK))))
+                    new ScenarioRegeneration(ScenarioModule.FIXED_CLOCK),
+                    new ScenarioModuleDependencies(java.util.Map.of()))))
         .getInstance(AssemblerFactory.class);
   }
 

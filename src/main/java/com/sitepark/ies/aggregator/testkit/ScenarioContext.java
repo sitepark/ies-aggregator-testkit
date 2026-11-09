@@ -96,6 +96,9 @@ public final class ScenarioContext {
    */
   public static final String USER_GROUPS_KEY = "userGroups";
 
+  /** The installed modules, a map {@code moduleId -> version}. */
+  public static final String MODULES_KEY = "modules";
+
   /**
    * Top-level key in a scenario file carrying the access restriction the channel reports for the
    * resource: {@code {"mode": "ALLOW"|"DENY", "groups": [...]}}. An absent block means the resource
@@ -177,6 +180,7 @@ public final class ScenarioContext {
   private final ScenarioResourceState resourceState;
   private final ScenarioPublishedLinks publishedLinks;
   private final ScenarioRegeneration regeneration;
+  private final ScenarioModuleDependencies moduleDependencies;
 
   /**
    * The resource as the template holds it between two sections - the scenario's {@link
@@ -197,6 +201,7 @@ public final class ScenarioContext {
       ScenarioResourceState resourceState,
       ScenarioPublishedLinks publishedLinks,
       ScenarioRegeneration regeneration,
+      ScenarioModuleDependencies moduleDependencies,
       Map<String, Object> enclosingResource) {
     this.repository = repository;
     this.layout = layout;
@@ -210,6 +215,7 @@ public final class ScenarioContext {
     this.resourceState = resourceState;
     this.publishedLinks = publishedLinks;
     this.regeneration = regeneration;
+    this.moduleDependencies = moduleDependencies;
     this.enclosingResource = enclosingResource;
   }
 
@@ -271,6 +277,12 @@ public final class ScenarioContext {
     ScenarioResourceState resourceState = new ScenarioResourceState();
     ScenarioPublishedLinks publishedLinks = new ScenarioPublishedLinks();
     ScenarioRegeneration regeneration = new ScenarioRegeneration(ScenarioModule.FIXED_CLOCK);
+    ScenarioModuleDependencies moduleDependencies =
+        new ScenarioModuleDependencies(
+            raw.get(MODULES_KEY) == null
+                ? Map.of()
+                : mapper.convertValue(
+                    raw.get(MODULES_KEY), new TypeReference<Map<String, String>>() {}));
     ChannelProvider channelProvider =
         new ScenarioChannelProvider(
             repository, accessRestriction(mapper, raw), channelConfig(mapper, raw));
@@ -296,7 +308,7 @@ public final class ScenarioContext {
                 new ScenarioHomepageProvider(repository, raw.get(OBJECT_TYPES_KEY)),
                 new ScenarioCategoryRootProvider(repository),
                 new ScenarioContentNotificationRecipientProvider(mapper, raw.get(USER_GROUPS_KEY))),
-            new PublisherPorts(resourceState, publishedLinks, regeneration)));
+            new PublisherPorts(resourceState, publishedLinks, regeneration, moduleDependencies)));
     modules.add(binder -> binder.bind(ScenarioFixture.class).toInstance(fixture));
     modules.addAll(ExtensionModules.of(packages));
     Injector injector = Guice.createInjector(modules);
@@ -313,6 +325,7 @@ public final class ScenarioContext {
         resourceState,
         publishedLinks,
         regeneration,
+        moduleDependencies,
         enclosingResource(mapper, raw));
   }
 
@@ -693,6 +706,17 @@ public final class ScenarioContext {
    */
   public Optional<Instant> regeneration() {
     return this.regeneration.moment();
+  }
+
+  /**
+   * The module dependencies the aggregations of this context reported to the publisher - only on
+   * modules the scenario's {@link #MODULES_KEY} block installs, each once, in the order first
+   * reported.
+   *
+   * <p>Like the published links this lives beside the resource, not in it.
+   */
+  public List<ModuleDependency> moduleDependencies() {
+    return this.moduleDependencies.reported();
   }
 
   /**
