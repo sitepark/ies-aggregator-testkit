@@ -96,7 +96,9 @@ final class ScenarioModule implements Module {
     binder.bind(MediaProvider.class).toInstance(this.mediaProvider);
     binder.bind(StructuredValueParser.class).toInstance(this.parser);
     binder.bind(ChannelProvider.class).toInstance(this.channelProvider);
-    binder.bind(Channel.class).toInstance(this.channelProvider.current());
+    binder
+        .bind(Channel.class)
+        .toProvider(ScenarioAggregationScope.channel(this.channelProvider.current()));
     binder.bind(VariantConfigProvider.class).toInstance(this.variantConfigProvider);
     binder.bind(RootResolverFactory.class).toInstance(this.rootResolverFactory);
     binder

@@ -398,7 +398,7 @@ public final class ScenarioContext {
    * @param <T> the aggregator type
    */
   public <T> T aggregator(Class<T> type) {
-    T aggregator = this.injector.getInstance(type);
+    T aggregator = ScenarioAggregationScope.outside(() -> this.injector.getInstance(type));
     if (aggregator instanceof Configurable<?> configurable) {
       this.configure(configurable);
     }
