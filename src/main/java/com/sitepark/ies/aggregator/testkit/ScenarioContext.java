@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.google.inject.ConfigurationException;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
+import com.google.inject.ProvisionException;
 import com.sitepark.ies.aggregator.Aggregator;
 import com.sitepark.ies.aggregator.Configurable;
 import com.sitepark.ies.aggregator.Configuration;
@@ -398,7 +400,14 @@ public final class ScenarioContext {
    * @param <T> the aggregator type
    */
   public <T> T aggregator(Class<T> type) {
-    T aggregator = ScenarioAggregationScope.outside(() -> this.injector.getInstance(type));
+    T aggregator;
+    try {
+      aggregator = ScenarioAggregationScope.outside(() -> this.injector.getInstance(type));
+    } catch (ConfigurationException e) {
+      throw InjectionFailure.of("Cannot build " + type.getName(), e);
+    } catch (ProvisionException e) {
+      throw InjectionFailure.of("Cannot build " + type.getName(), e);
+    }
     if (aggregator instanceof Configurable<?> configurable) {
       this.configure(configurable);
     }

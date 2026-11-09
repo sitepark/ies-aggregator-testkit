@@ -2,9 +2,9 @@ package com.sitepark.ies.aggregator.testkit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.google.inject.OutOfScopeException;
-import com.google.inject.ProvisionException;
 import com.sitepark.ies.aggregator.testkit.probe.ChannelInConstructorProbeAggregator;
 import com.sitepark.ies.aggregator.testkit.probe.ChannelProviderProbeAggregator;
 import org.junit.jupiter.api.Test;
@@ -27,10 +27,21 @@ class ScenarioContextScopeTest {
     ScenarioContext context = load();
 
     assertThatThrownBy(() -> context.aggregator(ChannelInConstructorProbeAggregator.class))
-        .isInstanceOf(ProvisionException.class)
-        .hasRootCauseInstanceOf(OutOfScopeException.class)
-        .rootCause()
-        .hasMessageContaining("channelId");
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("channelId")
+        .hasCauseInstanceOf(OutOfScopeException.class);
+  }
+
+  @Test
+  void reportsTheRefusalWithAMessageAndAStackTraceThatCanBePrinted() {
+    ScenarioContext context = load();
+
+    Throwable failure =
+        catchThrowable(() -> context.aggregator(ChannelInConstructorProbeAggregator.class));
+
+    // Guice's own exception would throw NoClassDefFoundError here (no ASM), which a test runner
+    // survives as "no test ran" - a green build with the failure in it.
+    assertThat(failure).hasStackTraceContaining("OutOfScopeException");
   }
 
   @Test
@@ -46,7 +57,7 @@ class ScenarioContextScopeTest {
     ScenarioContext context = load();
     try {
       context.aggregator(ChannelInConstructorProbeAggregator.class);
-    } catch (ProvisionException expected) {
+    } catch (IllegalStateException expected) {
       // the build above is refused; what follows must not be
     }
 

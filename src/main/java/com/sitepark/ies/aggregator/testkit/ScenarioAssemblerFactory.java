@@ -163,8 +163,10 @@ final class ScenarioAssemblerFactory implements AssemblerFactory {
   private Object instantiate(Class<?> impl) {
     try {
       return this.injector.getInstance(impl);
-    } catch (ConfigurationException | ProvisionException e) {
-      throw new IllegalStateException("Cannot instantiate " + impl.getName(), e);
+    } catch (ConfigurationException e) {
+      throw InjectionFailure.of("Cannot instantiate " + impl.getName(), e);
+    } catch (ProvisionException e) {
+      throw InjectionFailure.of("Cannot instantiate " + impl.getName(), e);
     }
   }
 }
