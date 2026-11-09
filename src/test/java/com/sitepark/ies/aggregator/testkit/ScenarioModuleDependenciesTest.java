@@ -33,6 +33,26 @@ class ScenarioModuleDependenciesTest {
   }
 
   @Test
+  void answersTheInstalledVersionAndReportsTheDependency() {
+    ScenarioModuleDependencies dependencies =
+        new ScenarioModuleDependencies(Map.of("bottrop", "3.4.0", "other", "1.0.0"));
+
+    assertThat(dependencies.version("bottrop")).contains("3.4.0");
+
+    assertThat(dependencies.reported()).containsExactly(new ModuleDependency("bottrop", "3.4.0"));
+  }
+
+  @Test
+  void answersNothingAndReportsNothingForAModuleTheScenarioDoesNotName() {
+    ScenarioModuleDependencies dependencies =
+        new ScenarioModuleDependencies(Map.of("bottrop", "3.4.0"));
+
+    assertThat(dependencies.version("wuppertal")).isEmpty();
+
+    assertThat(dependencies.reported()).isEmpty();
+  }
+
+  @Test
   void aScenarioWithoutModulesHasNoneInstalled() {
     ScenarioModuleDependencies dependencies = new ScenarioModuleDependencies(Map.of());
 

@@ -4,6 +4,7 @@ import com.sitepark.ies.aggregator.port.ModuleDependencies;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * {@link ModuleDependencies} of a scenario: records every dependency on a module the scenario's
@@ -24,10 +25,17 @@ final class ScenarioModuleDependencies implements ModuleDependencies {
 
   @Override
   public void dependsOn(String moduleId) {
+    this.version(moduleId);
+  }
+
+  @Override
+  public Optional<String> version(String moduleId) {
     String version = this.installed.get(moduleId);
-    if (version != null) {
-      this.reported.putIfAbsent(moduleId, new ModuleDependency(moduleId, version));
+    if (version == null) {
+      return Optional.empty();
     }
+    this.reported.putIfAbsent(moduleId, new ModuleDependency(moduleId, version));
+    return Optional.of(version);
   }
 
   List<ModuleDependency> reported() {
