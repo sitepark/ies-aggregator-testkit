@@ -118,6 +118,7 @@ extends: their constructors are package-private, as production never calls them 
 | `global` | the installation's global configuration, a map `entry name -> config` (`GlobalConfigProvider.configuration(name, type)`, SPML `system.config.global.<name>`); an unnamed entry or an absent block answers empty, so an unconfigured feature is off |
 | `sectionType` | the id of the section type the aggregator serves, a non-blank string; `context.aggregator(Class)` hands it to an aggregator that is `SectionTypeAware`, as the production factory does from the configuration, and fails to build one when the scenario names none - nothing is defaulted |
 | `userGroups` | the user groups of the IES user repository, a map `anchor -> {"qualifiedId": "…", "members": [{"email": ["a@x", …]}, …]}` (`ContentNotificationRecipientProvider.recipients(anchor)`); an unnamed anchor answers empty; each direct member contributes its first address, trimmed, skipped when blank or absent; no de-duplication, as in production |
+| `modules` | the installed modules, a map `moduleId -> version` (`ModuleDependencies.dependsOn(moduleId)`); a dependency on an id the block does not name is dropped, as production drops an unknown module; `ScenarioContext.moduleDependencies()` answers what was reported, once per module |
 | `variantConfig` | the image-variant catalog of the project configuration |
 
 An entry may carry `"archive": true`; its entity descriptor then answers `isArchive()` with `true`.

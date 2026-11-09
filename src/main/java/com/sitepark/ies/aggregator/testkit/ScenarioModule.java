@@ -15,6 +15,7 @@ import com.sitepark.ies.aggregator.port.GlobalConfigProvider;
 import com.sitepark.ies.aggregator.port.HomepageProvider;
 import com.sitepark.ies.aggregator.port.ImageScaler;
 import com.sitepark.ies.aggregator.port.MediaProvider;
+import com.sitepark.ies.aggregator.port.ModuleDependencies;
 import com.sitepark.ies.aggregator.port.ObjectTypeConfigProvider;
 import com.sitepark.ies.aggregator.port.PublishedLinks;
 import com.sitepark.ies.aggregator.port.Regeneration;
@@ -114,6 +115,7 @@ final class ScenarioModule implements Module {
     binder.bind(ResourceState.class).toInstance(this.publisherPorts.resourceState());
     binder.bind(PublishedLinks.class).toInstance(this.publisherPorts.publishedLinks());
     binder.bind(Regeneration.class).toInstance(this.publisherPorts.regeneration());
+    binder.bind(ModuleDependencies.class).toInstance(this.publisherPorts.moduleDependencies());
     binder.bind(DomainObjectMapper.class).to(ReflectiveDomainObjectMapper.class);
 
     binder.bind(ImageScaler.class).toInstance(new ScenarioImageScaler());
