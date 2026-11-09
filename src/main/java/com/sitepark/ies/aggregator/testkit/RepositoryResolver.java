@@ -28,9 +28,10 @@ import org.jspecify.annotations.Nullable;
  * {@link Resolver} view over a single {@link Repository} entry.
  *
  * <p>The access method decides how a field value is interpreted, matching the production semantics:
- * {@link #resolve(String)} treats a string as an id reference to another entry, whereas {@link
- * #value(String)} treats it as a scalar. This is why {@code parent} (navigated via {@code resolve})
- * follows a reference while {@code sp_imageCopyright} (read via {@code value}) stays a plain text.
+ * {@link #resolve(String)} navigates into objects only and refuses a leaf field, as production
+ * does, whereas {@link #value(String)} reads it as a scalar. Only the structural {@code parent}
+ * link is followed by {@code resolve} as a reference; {@code sp_imageCopyright} (read via {@code
+ * value}) stays a plain text, and a link field is followed with {@link #resolveLink(String)}.
  *
  * <p>An entry separates its structural metadata (its own {@code id}, an {@code anchor}, a {@code
  * parent} link, the {@code group} block, the {@code media} block, {@code media_options}, ...) from
@@ -201,10 +202,35 @@ final class RepositoryResolver implements GroupResolver {
     }
   }
 
+  /**
+   * Navigates into an object-valued field.
+   *
+   * <p>Only an object or a medium can be navigated into. In production a text, number, date, mail,
+   * url or link field is a {@code SimpleInformationVO}, and {@code ResolverContext.forInformation}
+   * refuses it with {@code UnsupportedOperationException: SimpleInformationVO not resolvable, use
+   * value() instead}; a link field is followed with {@link #resolveLink(String)} only. The harness
+   * refuses the same: a bare value, an id reference or a {@code {"link": ...}} wrapper is such a
+   * field. Answering it here let {@code resolve("sp_contactCityGov").resolveLink("link")} pass every
+   * scenario while every CityGov contact section failed on the CMS.
+   *
+   * @throws UnsupportedOperationException if the field is not an object
+   */
   @Override
   public Resolver resolve(String key) {
+    if (!PARENT_KEY.equals(key) && this.isLeafField(this.field(key))) {
+      throw new UnsupportedOperationException(
+          "SimpleInformationVO not resolvable, use value() instead: " + key);
+    }
     return this.resolverPath.descend(
         key, (path) -> this.repository.toResolver(path, this.field(key), this.keyOfChild(key)));
+  }
+
+  /** Whether a raw field value is one production holds as a {@code SimpleInformationVO}. */
+  private boolean isLeafField(@Nullable Object value) {
+    return value instanceof String
+        || value instanceof Number
+        || value instanceof Boolean
+        || (value instanceof Map<?, ?> map && map.get(LINK_KEY) != null);
   }
 
   /**
