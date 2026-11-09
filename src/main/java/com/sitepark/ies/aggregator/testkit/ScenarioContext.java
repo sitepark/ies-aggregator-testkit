@@ -9,6 +9,8 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 import com.sitepark.ies.aggregator.Aggregator;
+import com.sitepark.ies.aggregator.Configurable;
+import com.sitepark.ies.aggregator.Configuration;
 import com.sitepark.ies.aggregator.Options;
 import com.sitepark.ies.aggregator.OptionsAware;
 import com.sitepark.ies.aggregator.RootAggregator;
@@ -65,6 +67,8 @@ import org.jspecify.annotations.Nullable;
 @SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.ExcessiveImports"})
 public final class ScenarioContext {
 
+  private static final String UNCHECKED = "unchecked";
+
   /**
    * Base packages scanned for {@code @AssemblerBinding} classes by default. {@code com.sitepark}
    * covers the built-ins of the consuming project as well as any custom-extension project
@@ -95,6 +99,22 @@ public final class ScenarioContext {
    * name, or an absent block, answers empty.
    */
   public static final String USER_GROUPS_KEY = "userGroups";
+
+  /**
+   * Top-level key in a scenario file carrying the {@code aggregator} block of the section type's
+   * configuration, a map such as {@code {"module": "bottrop-module"}}: everything the block holds
+   * besides the class name and the registration. An aggregator that is {@link Configurable} is
+   * handed it as the {@code aggregator} part of its configuration, as {@code ConfigMapper} hands it
+   * in production.
+   */
+  public static final String AGGREGATOR_KEY = "aggregator";
+
+  /**
+   * Top-level key in a scenario file carrying the {@code template} block of the section type's
+   * configuration (the keys besides the template's uri), handed to a {@link Configurable}
+   * aggregator as the {@code template} part of its configuration.
+   */
+  public static final String TEMPLATE_KEY = "template";
 
   /** The installed modules, a map {@code moduleId -> version}. */
   public static final String MODULES_KEY = "modules";
@@ -177,6 +197,7 @@ public final class ScenarioContext {
   private final ObjectMapper jsonMapper;
   private final @Nullable Object rawOptions;
   private final @Nullable Object rawSectionType;
+  private final Map<String, Object> rawConfiguration;
   private final ScenarioResourceState resourceState;
   private final ScenarioPublishedLinks publishedLinks;
   private final ScenarioRegeneration regeneration;
@@ -198,6 +219,7 @@ public final class ScenarioContext {
       ObjectMapper jsonMapper,
       @Nullable Object rawOptions,
       @Nullable Object rawSectionType,
+      Map<String, Object> rawConfiguration,
       ScenarioResourceState resourceState,
       ScenarioPublishedLinks publishedLinks,
       ScenarioRegeneration regeneration,
@@ -212,6 +234,7 @@ public final class ScenarioContext {
     this.jsonMapper = jsonMapper;
     this.rawOptions = rawOptions;
     this.rawSectionType = rawSectionType;
+    this.rawConfiguration = rawConfiguration;
     this.resourceState = resourceState;
     this.publishedLinks = publishedLinks;
     this.regeneration = regeneration;
@@ -322,6 +345,7 @@ public final class ScenarioContext {
         mapper,
         rawOptions,
         raw.get(SECTION_TYPE_KEY),
+        configuration(raw),
         resourceState,
         publishedLinks,
         regeneration,
@@ -375,6 +399,9 @@ public final class ScenarioContext {
    */
   public <T> T aggregator(Class<T> type) {
     T aggregator = this.injector.getInstance(type);
+    if (aggregator instanceof Configurable<?> configurable) {
+      this.configure(configurable);
+    }
     if (aggregator instanceof OptionsAware<?> optionsAware) {
       this.setOptions(optionsAware);
     }
@@ -382,6 +409,35 @@ public final class ScenarioContext {
       sectionTypeAware.setSectionType(this.sectionType(type));
     }
     return aggregator;
+  }
+
+  /**
+   * The configuration the scenario hands a {@link Configurable} aggregator, built the way {@code
+   * ConfigMapper.createConfig} builds it: a map of {@code options}, {@code template} and {@code
+   * aggregator}, each present only when the scenario's block is not empty, converted to the
+   * configuration type the aggregator declares. A scenario that has none of the blocks yields an
+   * empty configuration, not none - production does the same. An aggregator that declares {@link
+   * Configurable} raw has no configuration type and is not configured.
+   */
+  private <C extends Configuration> void configure(Configurable<C> configurable) {
+    @SuppressWarnings(UNCHECKED)
+    Class<C> configurationType =
+        (Class<C>) declaredTypeArgument(configurable.getClass(), Configurable.class);
+    if (configurationType != null) {
+      configurable.configure(
+          this.jsonMapper.convertValue(this.rawConfiguration, configurationType));
+    }
+  }
+
+  /** The map {@code ConfigMapper.createConfig} converts: the non-empty blocks of the scenario. */
+  private static Map<String, Object> configuration(Map<String, Object> raw) {
+    Map<String, Object> configuration = new LinkedHashMap<>();
+    for (String key : List.of(OPTIONS_KEY, TEMPLATE_KEY, AGGREGATOR_KEY)) {
+      if (raw.get(key) instanceof Map<?, ?> block && !block.isEmpty()) {
+        configuration.put(key, block);
+      }
+    }
+    return configuration;
   }
 
   /**
@@ -408,26 +464,28 @@ public final class ScenarioContext {
    * options} block.
    */
   private <O extends Options> void setOptions(OptionsAware<O> optionsAware) {
-    @SuppressWarnings("unchecked")
-    Class<O> optionType = (Class<O>) optionTypeOf(optionsAware.getClass());
+    @SuppressWarnings(UNCHECKED)
+    Class<O> optionType =
+        (Class<O>) declaredTypeArgument(optionsAware.getClass(), OptionsAware.class);
     if (optionType != null) {
       optionsAware.setOptions(this.options(optionType));
     }
   }
 
   /**
-   * The type argument the class declares for {@link OptionsAware}, walking up its superclasses - an
+   * The type argument the class declares for the given generic interface, walking up its superclasses - an
    * aggregator declares it on itself, but may inherit the declaration.
    *
-   * @return the option type, or {@code null} if the declaration is raw
+   * @return the type argument, or {@code null} if the declaration is raw
    */
-  private static @Nullable Class<?> optionTypeOf(Class<?> aggregatorType) {
+  private static @Nullable Class<?> declaredTypeArgument(
+      Class<?> aggregatorType, Class<?> genericInterface) {
     for (Class<?> current = aggregatorType; current != null; current = current.getSuperclass()) {
       for (Type declared : current.getGenericInterfaces()) {
         if (declared instanceof ParameterizedType parameterized
-            && parameterized.getRawType() == OptionsAware.class
-            && parameterized.getActualTypeArguments()[0] instanceof Class<?> optionType) {
-          return optionType;
+            && parameterized.getRawType() == genericInterface
+            && parameterized.getActualTypeArguments()[0] instanceof Class<?> argument) {
+          return argument;
         }
       }
     }
@@ -596,7 +654,7 @@ public final class ScenarioContext {
    *
    * @return the resource as the page would hold it after this section
    */
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings(UNCHECKED)
   private Map<String, Object> mergeIntoEnclosing(Map<String, Object> written) {
     Map<String, Object> resource = new LinkedHashMap<>(written);
     for (Map.Entry<String, Object> entry : written.entrySet()) {
@@ -798,7 +856,7 @@ public final class ScenarioContext {
     }
   }
 
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings(UNCHECKED)
   private static Map<String, Object> repositoryEntries(String resource, Map<String, Object> raw) {
     Object repository = raw.get(REPOSITORY_KEY);
     if (!(repository instanceof Map)) {

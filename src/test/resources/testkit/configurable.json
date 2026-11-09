@@ -1,0 +1,6 @@
+{
+  "aggregator": { "module": "bottrop-module" },
+  "repository": {
+    "1000": { "id": 1000, "objectType": "content", "content": { "sp_headline": "A headline" } }
+  }
+}
