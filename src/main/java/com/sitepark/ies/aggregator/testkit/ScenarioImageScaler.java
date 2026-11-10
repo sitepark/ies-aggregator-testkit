@@ -34,12 +34,38 @@ final class ScenarioImageScaler implements ImageScaler {
   public List<ScaledImage> scale(ScaleImageRequest request) {
     List<ScaledImage> scaled = new ArrayList<>();
     for (ScaleImageTarget target : request.targets()) {
-      ComputedSize size = fit(target.size(), request.image());
+      // A derived box already has the source ratio up to rounding. Fitting it again would shrink
+      // the
+      // given dimension by a pixel; the engine keeps it (it scales by the given dimension).
+      boolean derived = target.size().width() == 0 || target.size().height() == 0;
+      ComputedSize box = derive(target.size(), request.image());
+      ComputedSize size = derived ? box : fit(box, request.image());
       int width = (int) Math.round(size.width());
       int height = (int) Math.round(size.height());
       scaled.add(ScaledImage.of(width, height, encodings(request.formats(), width, height)));
     }
     return scaled;
+  }
+
+  /**
+   * Completes a dimension that is 0, the way the engine does: it derives the missing dimension
+   * from the source ratio, rounds it and never exceeds the source size. Both dimensions 0 is an
+   * error there, too. A dimension that is set is left as it is.
+   */
+  private static ComputedSize derive(ComputedSize size, Image image) {
+    double width = size.width();
+    double height = size.height();
+    if (width == 0 && height == 0) {
+      throw new IllegalArgumentException("desiredWidth and desiredHeight are 0");
+    }
+    float ratio = (float) image.width() / (float) image.height();
+    if (width == 0) {
+      width = Math.min(image.width(), Math.round((float) height * ratio));
+    }
+    if (height == 0) {
+      height = Math.min(image.height(), Math.round((float) width / ratio));
+    }
+    return ComputedSize.of(width, height, size.fitMode());
   }
 
   /** Fits the requested box to the source's aspect ratio, for the one mode where that matters. */
