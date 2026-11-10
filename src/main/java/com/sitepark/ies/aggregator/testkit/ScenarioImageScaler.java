@@ -2,7 +2,6 @@ package com.sitepark.ies.aggregator.testkit;
 
 import com.sitepark.ies.aggregator.port.ImageScaler;
 import com.sitepark.ies.aggregator.value.media.Image;
-import com.sitepark.ies.aggregator.value.media.scaling.ComputedSize;
 import com.sitepark.ies.aggregator.value.media.scaling.Encoded;
 import com.sitepark.ies.aggregator.value.media.scaling.FitMode;
 import com.sitepark.ies.aggregator.value.media.scaling.Format;
@@ -15,18 +14,19 @@ import java.util.List;
 
 /**
  * Deterministic {@link ImageScaler} test double. It does not scale real pixels; for every requested
- * target it produces a {@link ScaledImage} whose dimensions are the computed size rounded to whole
- * pixels and whose URLs are derived from those dimensions and the requested formats, so a scenario's
- * scaled sources are stable and assertable against a golden file.
+ * target it produces a {@link ScaledImage} whose dimensions are those of production and whose URLs
+ * are derived from those dimensions and the requested formats, so a scenario's scaled sources are
+ * stable and assertable against a golden file.
+ *
+ * <p>It follows the production path step for step: a fractional target size is truncated to whole
+ * pixels (ies-3 casts to {@code int}), a dimension of 0 is derived from the source ratio and the
+ * result is computed like imgfile's {@code DimensionCalculator} does, with the same float and
+ * {@code Math.round} arithmetic. {@link FitMode#CONTAIN} fits the source inside the box, never
+ * enlarging it; the other three modes reach the box exactly. A zoom of a 3000×2250 source into a
+ * 1920×1920 box is therefore 1920×1440, as in production.
  *
  * <p>A request without an explicit format is answered with a single JPEG encoding, mirroring an
  * engine that derives the output format from the source image.
- *
- * <p>The one part of real scaling it does reproduce is {@link FitMode#CONTAIN}, because that is the
- * only mode whose result differs from the requested box: it fits the source inside the box instead
- * of filling it. The other three reach the box exactly by definition, so returning it verbatim is
- * faithful for them. Without this, a zoom of a 3000×2250 source into a 1920×1920 box would be
- * recorded as 1920×1920 in a golden file while production produces 1920×1440.
  */
 final class ScenarioImageScaler implements ImageScaler {
 
@@ -34,47 +34,58 @@ final class ScenarioImageScaler implements ImageScaler {
   public List<ScaledImage> scale(ScaleImageRequest request) {
     List<ScaledImage> scaled = new ArrayList<>();
     for (ScaleImageTarget target : request.targets()) {
-      // A derived box already has the source ratio up to rounding. Fitting it again would shrink
-      // the
-      // given dimension by a pixel; the engine keeps it (it scales by the given dimension).
-      boolean derived = target.size().width() == 0 || target.size().height() == 0;
-      ComputedSize box = derive(target.size(), request.image());
-      ComputedSize size = derived ? box : fit(box, request.image());
-      int width = (int) Math.round(size.width());
-      int height = (int) Math.round(size.height());
-      scaled.add(ScaledImage.of(width, height, encodings(request.formats(), width, height)));
+      // Production hands the engine whole pixels: ies-3 InternalImageScaler casts (int), so a
+      // fractional size is truncated, not rounded.
+      int desiredWidth = (int) target.size().width();
+      int desiredHeight = (int) target.size().height();
+      int[] size = size(request.image(), desiredWidth, desiredHeight, target.size().fitMode());
+      scaled.add(ScaledImage.of(size[0], size[1], encodings(request.formats(), size[0], size[1])));
     }
     return scaled;
   }
 
   /**
-   * Completes a dimension that is 0, the way the engine does: it derives the missing dimension
-   * from the source ratio, rounds it and never exceeds the source size. Both dimensions 0 is an
-   * error there, too. A dimension that is set is left as it is.
+   * Computes the output size the way imgfile's {@code ImageIO.getScaleImage} does without scale
+   * steps: {@code DimensionCalculator.calculate()} followed by {@code LegacyPropertiesCalculator}.
+   * Only {@link FitMode#CONTAIN} (neither fit nor padding) takes the size from the dimension
+   * calculator; the other three modes reach the desired box.
    */
-  private static ComputedSize derive(ComputedSize size, Image image) {
-    double width = size.width();
-    double height = size.height();
+  private static int[] size(Image image, int desiredWidth, int desiredHeight, FitMode fitMode) {
+    int sourceWidth = image.width();
+    int sourceHeight = image.height();
+    int width = desiredWidth;
+    int height = desiredHeight;
+
+    // AbstractDimesionCalculator.calculateMissingDimension: float arithmetic, Math.round, capped
+    // at the source size.
     if (width == 0 && height == 0) {
       throw new IllegalArgumentException("desiredWidth and desiredHeight are 0");
     }
-    float ratio = (float) image.width() / (float) image.height();
     if (width == 0) {
-      width = Math.min(image.width(), Math.round((float) height * ratio));
+      width =
+          Math.min(Math.round(height * ((float) sourceWidth / (float) sourceHeight)), sourceWidth);
     }
     if (height == 0) {
-      height = Math.min(image.height(), Math.round((float) width / ratio));
+      height =
+          Math.min(Math.round(width / ((float) sourceWidth / (float) sourceHeight)), sourceHeight);
     }
-    return ComputedSize.of(width, height, size.fitMode());
-  }
+    if (fitMode != FitMode.CONTAIN || sourceWidth <= 0 || sourceHeight <= 0) {
+      return new int[] {width, height};
+    }
 
-  /** Fits the requested box to the source's aspect ratio, for the one mode where that matters. */
-  private static ComputedSize fit(ComputedSize size, Image image) {
-    if (size.fitMode() != FitMode.CONTAIN || image.width() <= 0 || image.height() <= 0) {
-      return size;
+    // DimensionCalculator.calculateDimension with the lower factor (fit is false); a scale above 1
+    // is only kept for SVG, which has no pixel size to exceed.
+    double factorByWidth = (double) width / (double) sourceWidth;
+    double factorByHeight = (double) height / (double) sourceHeight;
+    double scale = factorByWidth < factorByHeight ? factorByWidth : factorByHeight;
+    if (scale > 1 && !"image/svg+xml".equals(image.mimeType())) {
+      scale = 1;
     }
-    double factor = Math.min(size.width() / image.width(), size.height() / image.height());
-    return ComputedSize.of(image.width() * factor, image.height() * factor, FitMode.CONTAIN);
+    // minimumCorrection
+    return new int[] {
+      Math.max(1, Math.round((float) sourceWidth * (float) scale)),
+      Math.max(1, Math.round((float) sourceHeight * (float) scale))
+    };
   }
 
   private static List<Encoded> encodings(List<Format> formats, int width, int height) {

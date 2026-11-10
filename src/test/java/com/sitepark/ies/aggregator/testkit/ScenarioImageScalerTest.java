@@ -100,13 +100,75 @@ class ScenarioImageScalerTest {
   }
 
   @Test
-  void keepsTheGivenDimensionOfADerivedBoxForContain() {
+  void fitsADerivedBoxForContainWithTheEngineArithmetic() {
     ScaledImage scaled = scale(image(3760, 2454), 393, 0, FitMode.CONTAIN);
 
-    assertThat(scaled.width()).as("the fit must not take a pixel off the width").isEqualTo(393);
+    // The derived height is round(393 / (3760f / 2454f)) = 256 (256.5 in float rounds down here),
+    // so the lower factor is the one of the height (256 / 2454) and it takes a pixel off the width:
+    // the engine does not keep the given 393.
+    assertThat(scaled.height()).isEqualTo(256);
+    assertThat(scaled.width()).isEqualTo(392);
+  }
+
+  @Test
+  void truncatesAFractionalSizeLikeProduction() {
+    ScaledImage scaled = scale(image(3000, 2000), 232, 154.67, FitMode.COVER);
+
+    assertThat(scaled.width()).isEqualTo(232);
     assertThat(scaled.height())
-        .as("393 * 2454 / 3760 = 256.5 in float, rounded")
-        .isBetween(256, 257);
+        .as("production casts to int: 154.67 is 154, the box is not rounded to 155")
+        .isEqualTo(154);
+  }
+
+  @Test
+  void truncatesBeforeDerivingTheMissingDimension() {
+    ScaledImage scaled = scale(image(1600, 900), 0, 337.9, FitMode.COVER);
+
+    assertThat(scaled.height()).isEqualTo(337);
+    assertThat(scaled.width()).as("round(337 * 1600f / 900f) = 599").isEqualTo(599);
+  }
+
+  @Test
+  void containKeepsTheGivenDimensionWhenItIsTheLowerFactor() {
+    // imgfile DimensionCalculatorTest: source 800x600, desired 600x400 -> 533x400
+    ScaledImage scaled = scale(image(800, 600), 600, 400, FitMode.CONTAIN);
+
+    assertThat(scaled.width()).isEqualTo(533);
+    assertThat(scaled.height()).isEqualTo(400);
+  }
+
+  @Test
+  void containNeverEnlargesTheSource() {
+    // imgfile DimensionCalculatorTest: source 800x600, desired 1000x900 -> 800x600
+    ScaledImage scaled = scale(image(800, 600), 1000, 900, FitMode.CONTAIN);
+
+    assertThat(scaled.width()).isEqualTo(800);
+    assertThat(scaled.height()).isEqualTo(600);
+  }
+
+  @Test
+  void containFitsAPortraitSource() {
+    // imgfile DimensionCalculatorTest: source 600x800, desired 400x600 -> 400x533
+    ScaledImage scaled = scale(image(600, 800), 400, 600, FitMode.CONTAIN);
+
+    assertThat(scaled.width()).isEqualTo(400);
+    assertThat(scaled.height()).isEqualTo(533);
+  }
+
+  @Test
+  void containTruncatesTheBoxBeforeFitting() {
+    ScaledImage scaled = scale(image(800, 600), 600.9, 400.9, FitMode.CONTAIN);
+
+    assertThat(scaled.width()).isEqualTo(533);
+    assertThat(scaled.height()).isEqualTo(400);
+  }
+
+  @Test
+  void coverAndPadReachTheBoxEvenWhenItExceedsTheSource() {
+    // With fit or padding the legacy properties are the desired box (ImageIO.getScaleImage).
+    assertThat(scale(image(800, 600), 1000, 900, FitMode.COVER).width()).isEqualTo(1000);
+    assertThat(scale(image(800, 600), 1000, 900, FitMode.PAD).height()).isEqualTo(900);
+    assertThat(scale(image(800, 600), 1000, 900, FitMode.COVER_OR_PAD).width()).isEqualTo(1000);
   }
 
   @Test
