@@ -16,6 +16,7 @@ import com.sitepark.ies.aggregator.port.HomepageProvider;
 import com.sitepark.ies.aggregator.port.MediaProvider;
 import com.sitepark.ies.aggregator.port.ObjectTypeConfigProvider;
 import com.sitepark.ies.aggregator.port.VariantConfigProvider;
+import com.sitepark.ies.aggregator.port.ZipArchives;
 import com.sitepark.ies.aggregator.resolver.RootResolverFactory;
 import com.sitepark.ies.aggregator.testkit.chainfixture.ChainProbe;
 import com.sitepark.ies.aggregator.value.StructuredValueParser;
@@ -60,7 +61,8 @@ class ChainAssemblerFactoryTest {
                     new ScenarioResourceState(),
                     new ScenarioPublishedLinks(),
                     new ScenarioRegeneration(ScenarioModule.FIXED_CLOCK),
-                    new ScenarioModuleDependencies(java.util.Map.of()))))
+                    new ScenarioModuleDependencies(java.util.Map.of()),
+                    mock(ZipArchives.class))))
         .getInstance(AssemblerFactory.class);
   }
 

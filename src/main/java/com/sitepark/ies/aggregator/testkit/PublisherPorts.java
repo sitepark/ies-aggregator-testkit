@@ -4,6 +4,7 @@ import com.sitepark.ies.aggregator.port.ModuleDependencies;
 import com.sitepark.ies.aggregator.port.PublishedLinks;
 import com.sitepark.ies.aggregator.port.Regeneration;
 import com.sitepark.ies.aggregator.port.ResourceState;
+import com.sitepark.ies.aggregator.port.ZipArchives;
 
 /**
  * The ports through which an aggregation talks to the publisher beside its output: the state shared
@@ -14,9 +15,11 @@ import com.sitepark.ies.aggregator.port.ResourceState;
  * @param publishedLinks where external links are reported
  * @param regeneration where the moment of the next generation is reported
  * @param moduleDependencies where the modules the output depends on are reported
+ * @param zipArchives where the archives of media are written
  */
 record PublisherPorts(
     ResourceState resourceState,
     PublishedLinks publishedLinks,
     Regeneration regeneration,
-    ModuleDependencies moduleDependencies) {}
+    ModuleDependencies moduleDependencies,
+    ZipArchives zipArchives) {}

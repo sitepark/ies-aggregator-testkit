@@ -204,6 +204,7 @@ public final class ScenarioContext {
   private final ScenarioPublishedLinks publishedLinks;
   private final ScenarioRegeneration regeneration;
   private final ScenarioModuleDependencies moduleDependencies;
+  private final ScenarioZipArchives zipArchives;
 
   /**
    * The resource as the template holds it between two sections - the scenario's {@link
@@ -226,6 +227,7 @@ public final class ScenarioContext {
       ScenarioPublishedLinks publishedLinks,
       ScenarioRegeneration regeneration,
       ScenarioModuleDependencies moduleDependencies,
+      ScenarioZipArchives zipArchives,
       Map<String, Object> enclosingResource) {
     this.repository = repository;
     this.layout = layout;
@@ -241,6 +243,7 @@ public final class ScenarioContext {
     this.publishedLinks = publishedLinks;
     this.regeneration = regeneration;
     this.moduleDependencies = moduleDependencies;
+    this.zipArchives = zipArchives;
     this.enclosingResource = enclosingResource;
   }
 
@@ -311,6 +314,7 @@ public final class ScenarioContext {
     ChannelProvider channelProvider =
         new ScenarioChannelProvider(
             repository, accessRestriction(mapper, raw), channelConfig(mapper, raw));
+    ScenarioZipArchives zipArchives = new ScenarioZipArchives(repository, channelProvider);
     // Only the ports are wired by hand; every assembler and every collaborator behind them is built
     // by the injector from its @Inject constructor, the way the production container does it. Next
     // to them go the modules the extensions of the scanned packages contribute, as in production,
@@ -333,7 +337,8 @@ public final class ScenarioContext {
                 new ScenarioHomepageProvider(repository, raw.get(OBJECT_TYPES_KEY)),
                 new ScenarioCategoryRootProvider(repository),
                 new ScenarioContentNotificationRecipientProvider(mapper, raw.get(USER_GROUPS_KEY))),
-            new PublisherPorts(resourceState, publishedLinks, regeneration, moduleDependencies)));
+            new PublisherPorts(
+                resourceState, publishedLinks, regeneration, moduleDependencies, zipArchives)));
     modules.add(binder -> binder.bind(ScenarioFixture.class).toInstance(fixture));
     modules.addAll(ExtensionModules.of(packages));
     Injector injector = Guice.createInjector(modules);
@@ -352,6 +357,7 @@ public final class ScenarioContext {
         publishedLinks,
         regeneration,
         moduleDependencies,
+        zipArchives,
         enclosingResource(mapper, raw));
   }
 
@@ -784,6 +790,17 @@ public final class ScenarioContext {
    */
   public List<ModuleDependency> moduleDependencies() {
     return this.moduleDependencies.reported();
+  }
+
+  /**
+   * The zip archives the aggregations of this context had the publisher write, in the order they
+   * were created.
+   *
+   * <p>The archive lies beside the resource, not in it - only the link to it is part of the output
+   * - so no expectation file shows its entries; a test asks here instead.
+   */
+  public List<CreatedZipArchive> zipArchives() {
+    return this.zipArchives.created();
   }
 
   /**

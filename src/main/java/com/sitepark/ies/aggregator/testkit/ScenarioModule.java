@@ -21,6 +21,7 @@ import com.sitepark.ies.aggregator.port.PublishedLinks;
 import com.sitepark.ies.aggregator.port.Regeneration;
 import com.sitepark.ies.aggregator.port.ResourceState;
 import com.sitepark.ies.aggregator.port.VariantConfigProvider;
+import com.sitepark.ies.aggregator.port.ZipArchives;
 import com.sitepark.ies.aggregator.resolver.RootResolverFactory;
 import com.sitepark.ies.aggregator.value.StructuredValueParser;
 import java.time.Clock;
@@ -118,6 +119,7 @@ final class ScenarioModule implements Module {
     binder.bind(PublishedLinks.class).toInstance(this.publisherPorts.publishedLinks());
     binder.bind(Regeneration.class).toInstance(this.publisherPorts.regeneration());
     binder.bind(ModuleDependencies.class).toInstance(this.publisherPorts.moduleDependencies());
+    binder.bind(ZipArchives.class).toInstance(this.publisherPorts.zipArchives());
     binder.bind(DomainObjectMapper.class).to(ReflectiveDomainObjectMapper.class);
 
     binder.bind(ImageScaler.class).toInstance(new ScenarioImageScaler());
