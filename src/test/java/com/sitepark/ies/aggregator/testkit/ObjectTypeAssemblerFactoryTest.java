@@ -15,6 +15,7 @@ import com.sitepark.ies.aggregator.port.GlobalConfigProvider;
 import com.sitepark.ies.aggregator.port.HomepageProvider;
 import com.sitepark.ies.aggregator.port.MediaProvider;
 import com.sitepark.ies.aggregator.port.ObjectTypeConfigProvider;
+import com.sitepark.ies.aggregator.port.ObjectTypeEntities;
 import com.sitepark.ies.aggregator.port.VariantConfigProvider;
 import com.sitepark.ies.aggregator.port.ZipArchives;
 import com.sitepark.ies.aggregator.resolver.Resolver;
@@ -60,6 +61,7 @@ class ObjectTypeAssemblerFactoryTest {
                     mock(GlobalConfigProvider.class),
                     mock(HomepageProvider.class),
                     mock(CategoryRootProvider.class),
+                    mock(ObjectTypeEntities.class),
                     mock(ContentNotificationRecipientProvider.class)),
                 new PublisherPorts(
                     new ScenarioResourceState(),

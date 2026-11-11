@@ -17,6 +17,7 @@ import com.sitepark.ies.aggregator.port.ImageScaler;
 import com.sitepark.ies.aggregator.port.MediaProvider;
 import com.sitepark.ies.aggregator.port.ModuleDependencies;
 import com.sitepark.ies.aggregator.port.ObjectTypeConfigProvider;
+import com.sitepark.ies.aggregator.port.ObjectTypeEntities;
 import com.sitepark.ies.aggregator.port.PublishedLinks;
 import com.sitepark.ies.aggregator.port.Regeneration;
 import com.sitepark.ies.aggregator.port.ResourceState;
@@ -112,6 +113,7 @@ final class ScenarioModule implements Module {
     binder
         .bind(CategoryRootProvider.class)
         .toInstance(this.installationPorts.categoryRootProvider());
+    binder.bind(ObjectTypeEntities.class).toInstance(this.installationPorts.objectTypeEntities());
     binder
         .bind(ContentNotificationRecipientProvider.class)
         .toInstance(this.installationPorts.contentNotificationRecipientProvider());

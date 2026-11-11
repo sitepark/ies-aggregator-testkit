@@ -336,6 +336,7 @@ public final class ScenarioContext {
                 new ScenarioGlobalConfigProvider(mapper, raw.get(GLOBAL_KEY)),
                 new ScenarioHomepageProvider(repository, raw.get(OBJECT_TYPES_KEY)),
                 new ScenarioCategoryRootProvider(repository),
+                new ScenarioObjectTypeEntities(repository),
                 new ScenarioContentNotificationRecipientProvider(mapper, raw.get(USER_GROUPS_KEY))),
             new PublisherPorts(
                 resourceState, publishedLinks, regeneration, moduleDependencies, zipArchives)));
