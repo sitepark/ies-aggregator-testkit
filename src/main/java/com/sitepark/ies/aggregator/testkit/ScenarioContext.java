@@ -173,6 +173,17 @@ public final class ScenarioContext {
   public static final String ENCLOSING_RESOURCE_KEY = "enclosingResource";
 
   /**
+   * Top-level key in a scenario file carrying the section a container hands the section type, as
+   * {@code contentContainer.spml} passes {@code system.arguments.section}: e.g. {@code {"type":
+   * "section", "id": "section-1"}}. While {@link #aggregateAsSection} plays the tag, what the
+   * section type writes about its section is merged flat into that section's {@code model}, as the
+   * tag merges it, and the section is part of the result under the same key. An absent block means
+   * a section type outside any container: what it writes about a section is dropped, as in
+   * production.
+   */
+  public static final String SECTION_KEY = "section";
+
+  /**
    * Top-level key in a scenario file carrying what the channel says about itself: {@code {"nature":
    * "intranet", "attributes": {"name": "value"}, "tenantName": "Stadt"}}. An absent block means a
    * channel that declares none of them — the same answer a publisher with nothing configured gives.
@@ -187,6 +198,7 @@ public final class ScenarioContext {
   public static final String SOURCE_ID = "1000";
 
   private static final String ITEMS = "items";
+  private static final String MODEL = "model";
   private static final String TYPE = "type";
   private static final String ID = "id";
 
@@ -213,6 +225,9 @@ public final class ScenarioContext {
    */
   private final Map<String, Object> enclosingResource;
 
+  /** The section the container hands in - the scenario's {@link #SECTION_KEY}, if any. */
+  private final @Nullable Map<String, Object> section;
+
   private ScenarioContext(
       Repository repository,
       ScenarioLayout layout,
@@ -228,7 +243,8 @@ public final class ScenarioContext {
       ScenarioRegeneration regeneration,
       ScenarioModuleDependencies moduleDependencies,
       ScenarioZipArchives zipArchives,
-      Map<String, Object> enclosingResource) {
+      Map<String, Object> enclosingResource,
+      @Nullable Map<String, Object> section) {
     this.repository = repository;
     this.layout = layout;
     this.injector = injector;
@@ -245,6 +261,7 @@ public final class ScenarioContext {
     this.moduleDependencies = moduleDependencies;
     this.zipArchives = zipArchives;
     this.enclosingResource = enclosingResource;
+    this.section = section;
   }
 
   /**
@@ -359,7 +376,23 @@ public final class ScenarioContext {
         regeneration,
         moduleDependencies,
         zipArchives,
-        enclosingResource(mapper, raw));
+        enclosingResource(mapper, raw),
+        section(mapper, raw));
+  }
+
+  /**
+   * Reads the section a container hands in; absent means a section type outside any container.
+   * {@code null} is that absence - an empty map would be a section without a single field.
+   */
+  @SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull")
+  private static @Nullable Map<String, Object> section(
+      ObjectMapper mapper, Map<String, Object> raw) {
+    Object section = raw.get(SECTION_KEY);
+    if (section == null) {
+      return null;
+    }
+    return new LinkedHashMap<>(
+        mapper.convertValue(section, new TypeReference<Map<String, Object>>() {}));
   }
 
   /**
@@ -648,6 +681,7 @@ public final class ScenarioContext {
     copyRendered(aggregated, section);
     for (Map.Entry<String, Object> entry : tagRoot.entries().entrySet()) {
       if (!this.layout.contentArea().equals(entry.getKey())
+          && !SECTION_KEY.equals(entry.getKey())
           && entry.getValue() instanceof OutputObject area) {
         copyRendered(area, root.node(entry.getKey()));
       }
@@ -659,7 +693,36 @@ public final class ScenarioContext {
       container.addComponent(section);
     }
 
-    return pretty(this.mergeIntoEnclosing(this.parse(toJson(root))));
+    Map<String, Object> resource = this.mergeIntoEnclosing(this.parse(toJson(root)));
+    if (this.section != null) {
+      this.mergeIntoSection(tagRoot);
+      resource.put(SECTION_KEY, this.section);
+    }
+    return pretty(resource);
+  }
+
+  /**
+   * Merges what the section type wrote about its section into the section the container handed
+   * in, the way {@code AggregatorTag.mergeSection} does it: flat into the section's {@code model},
+   * which is created when the section has none yet. Entries that render empty are left out, as
+   * the tag's conversion leaves them out.
+   */
+  @SuppressWarnings(UNCHECKED)
+  private void mergeIntoSection(OutputObject tagRoot) {
+    Map<String, Object> target = this.section;
+    if (target == null || !(tagRoot.entries().get(SECTION_KEY) instanceof OutputObject written)) {
+      return;
+    }
+    OutputObject rendered = new OutputObject(null, null);
+    copyRendered(written, rendered);
+    Map<String, Object> model;
+    if (target.get(MODEL) instanceof Map<?, ?> existing) {
+      model = (Map<String, Object>) existing;
+    } else {
+      model = new LinkedHashMap<>();
+      target.put(MODEL, model);
+    }
+    model.putAll(this.parse(toJson(rendered)));
   }
 
   /**

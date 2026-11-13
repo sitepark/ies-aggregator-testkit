@@ -1,0 +1,17 @@
+{
+  "section": {
+    "type": "implicitSection",
+    "id": "implicitSection-1",
+    "model": {
+      "implicit": true
+    }
+  },
+  "repository": {
+    "1000": {
+      "id": 1000,
+      "content": {
+        "sp_headline": "Joins the model"
+      }
+    }
+  }
+}
