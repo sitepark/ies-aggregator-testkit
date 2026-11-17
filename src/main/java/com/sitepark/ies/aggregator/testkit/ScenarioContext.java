@@ -191,6 +191,21 @@ public final class ScenarioContext {
   public static final String CHANNEL_KEY = "channel";
 
   /**
+   * Top-level key in a scenario file carrying the trees of the section containers, as the platform
+   * would answer them: a map {@code address -> list of nodes}. See {@link
+   * ScenarioContainerHierarchy} for the address and the nodes. An absent block means no container
+   * has any entries.
+   */
+  public static final String CONTAINERS_KEY = "containers";
+
+  /**
+   * Top-level key in a scenario file carrying how many ids the sections before the one under test
+   * already drew: a map {@code name -> count}, e.g. {@code {"text": 3}}. The next {@code text} id
+   * is then {@code text-4}. An absent block, or a name it does not hold, starts at 1.
+   */
+  public static final String ID_SEQUENCE_KEY = "idSequence";
+
+  /**
    * Id of the repository entry the aggregation starts from in every scenario (by convention
    * {@code 1000}). {@link #aggregate} resolves it as the entry point of the aggregation and reuses
    * it as the id of the aggregated component.
@@ -354,9 +369,15 @@ public final class ScenarioContext {
                 new ScenarioHomepageProvider(repository, raw.get(OBJECT_TYPES_KEY)),
                 new ScenarioCategoryRootProvider(repository),
                 new ScenarioObjectTypeEntities(repository),
-                new ScenarioContentNotificationRecipientProvider(mapper, raw.get(USER_GROUPS_KEY))),
+                new ScenarioContentNotificationRecipientProvider(mapper, raw.get(USER_GROUPS_KEY)),
+                new ScenarioContainerHierarchy(repository, SOURCE_ID, raw.get(CONTAINERS_KEY))),
             new PublisherPorts(
-                resourceState, publishedLinks, regeneration, moduleDependencies, zipArchives)));
+                resourceState,
+                publishedLinks,
+                regeneration,
+                moduleDependencies,
+                zipArchives,
+                new ScenarioIdSequence(raw.get(ID_SEQUENCE_KEY)))));
     modules.add(binder -> binder.bind(ScenarioFixture.class).toInstance(fixture));
     modules.addAll(ExtensionModules.of(packages));
     Injector injector = Guice.createInjector(modules);

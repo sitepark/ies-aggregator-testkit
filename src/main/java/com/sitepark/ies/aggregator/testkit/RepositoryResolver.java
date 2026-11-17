@@ -575,6 +575,11 @@ final class RepositoryResolver implements GroupResolver {
     return this.node.containsKey(CONTENT_KEY);
   }
 
+  /** The {@code id} of the node, empty if it has none; names the node for scenario blocks. */
+  String entryId() {
+    return this.structural("id").asString("");
+  }
+
   /** Reads the entry's structural metadata, which no field access may reach. */
   private ResolvedValue structural(String key) {
     Object value = this.node.get(key);

@@ -1,6 +1,7 @@
 package com.sitepark.ies.aggregator.testkit;
 
 import com.sitepark.ies.aggregator.port.CategoryRootProvider;
+import com.sitepark.ies.aggregator.port.ContainerHierarchy;
 import com.sitepark.ies.aggregator.port.ContentNotificationRecipientProvider;
 import com.sitepark.ies.aggregator.port.GlobalConfigProvider;
 import com.sitepark.ies.aggregator.port.HomepageProvider;
@@ -17,6 +18,7 @@ import com.sitepark.ies.aggregator.port.ObjectTypeEntities;
  * @param categoryRootProvider the category roots of the installation
  * @param objectTypeEntities the entities of an object type
  * @param contentNotificationRecipientProvider the recipients of a content notification
+ * @param containerHierarchy the trees of the section containers
  */
 record InstallationPorts(
     ObjectTypeConfigProvider objectTypeConfigProvider,
@@ -24,4 +26,5 @@ record InstallationPorts(
     HomepageProvider homepageProvider,
     CategoryRootProvider categoryRootProvider,
     ObjectTypeEntities objectTypeEntities,
-    ContentNotificationRecipientProvider contentNotificationRecipientProvider) {}
+    ContentNotificationRecipientProvider contentNotificationRecipientProvider,
+    ContainerHierarchy containerHierarchy) {}

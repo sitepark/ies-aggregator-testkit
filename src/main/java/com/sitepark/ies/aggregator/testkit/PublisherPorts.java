@@ -1,5 +1,6 @@
 package com.sitepark.ies.aggregator.testkit;
 
+import com.sitepark.ies.aggregator.port.IdSequence;
 import com.sitepark.ies.aggregator.port.ModuleDependencies;
 import com.sitepark.ies.aggregator.port.PublishedLinks;
 import com.sitepark.ies.aggregator.port.Regeneration;
@@ -16,10 +17,12 @@ import com.sitepark.ies.aggregator.port.ZipArchives;
  * @param regeneration where the moment of the next generation is reported
  * @param moduleDependencies where the modules the output depends on are reported
  * @param zipArchives where the archives of media are written
+ * @param idSequence the counters of the component ids of the resource
  */
 record PublisherPorts(
     ResourceState resourceState,
     PublishedLinks publishedLinks,
     Regeneration regeneration,
     ModuleDependencies moduleDependencies,
-    ZipArchives zipArchives) {}
+    ZipArchives zipArchives,
+    IdSequence idSequence) {}

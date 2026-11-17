@@ -10,9 +10,11 @@ import com.sitepark.ies.aggregator.port.AssemblerFactory;
 import com.sitepark.ies.aggregator.port.CategoryRootProvider;
 import com.sitepark.ies.aggregator.port.Channel;
 import com.sitepark.ies.aggregator.port.ChannelProvider;
+import com.sitepark.ies.aggregator.port.ContainerHierarchy;
 import com.sitepark.ies.aggregator.port.ContentNotificationRecipientProvider;
 import com.sitepark.ies.aggregator.port.GlobalConfigProvider;
 import com.sitepark.ies.aggregator.port.HomepageProvider;
+import com.sitepark.ies.aggregator.port.IdSequence;
 import com.sitepark.ies.aggregator.port.ImageScaler;
 import com.sitepark.ies.aggregator.port.MediaProvider;
 import com.sitepark.ies.aggregator.port.ModuleDependencies;
@@ -50,6 +52,7 @@ import java.time.ZoneOffset;
  *   <li>the {@link ImageScaler} is the deterministic {@link ScenarioImageScaler}.
  * </ul>
  */
+@SuppressWarnings("PMD.ExcessiveImports") // binds one stand-in per port, so imports every port
 final class ScenarioModule implements Module {
 
   /**
@@ -122,6 +125,8 @@ final class ScenarioModule implements Module {
     binder.bind(Regeneration.class).toInstance(this.publisherPorts.regeneration());
     binder.bind(ModuleDependencies.class).toInstance(this.publisherPorts.moduleDependencies());
     binder.bind(ZipArchives.class).toInstance(this.publisherPorts.zipArchives());
+    binder.bind(IdSequence.class).toInstance(this.publisherPorts.idSequence());
+    binder.bind(ContainerHierarchy.class).toInstance(this.installationPorts.containerHierarchy());
     binder.bind(DomainObjectMapper.class).to(ReflectiveDomainObjectMapper.class);
 
     binder.bind(ImageScaler.class).toInstance(new ScenarioImageScaler());

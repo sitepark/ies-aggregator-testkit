@@ -1,0 +1,36 @@
+{
+  "idSequence": {
+    "text": 3,
+    "section": 1
+  },
+  "containers": {
+    "sp_main_iterate": [
+      {"entry": "2001", "index": 0, "rule": {"newSection": false}},
+      {
+        "section": {
+          "outputType": "section",
+          "implicit": true,
+          "ordinal": 1,
+          "children": [{"entry": "2002", "index": 1}]
+        }
+      },
+      {
+        "section": {
+          "outputType": "accordion",
+          "ordinal": 2,
+          "opener": {"entry": "2003", "index": 2, "rule": {"newSection": true, "sectionLevel": 1, "type": "accordion"}},
+          "children": []
+        }
+      }
+    ],
+    "2003/sp_main_iterate": [
+      {"entry": "2001", "index": 0}
+    ]
+  },
+  "repository": {
+    "1000": {"id": 1000, "content": {"sp_headline": "Page"}},
+    "2001": {"id": 2001, "content": {"sp_headline": "First"}},
+    "2002": {"id": 2002, "content": {"sp_headline": "Second"}},
+    "2003": {"id": 2003, "content": {"sp_headline": "Opener"}}
+  }
+}

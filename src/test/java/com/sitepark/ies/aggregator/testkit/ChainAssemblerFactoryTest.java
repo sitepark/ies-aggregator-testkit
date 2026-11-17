@@ -58,13 +58,15 @@ class ChainAssemblerFactoryTest {
                     mock(HomepageProvider.class),
                     mock(CategoryRootProvider.class),
                     mock(ObjectTypeEntities.class),
-                    mock(ContentNotificationRecipientProvider.class)),
+                    mock(ContentNotificationRecipientProvider.class),
+                    mock(com.sitepark.ies.aggregator.port.ContainerHierarchy.class)),
                 new PublisherPorts(
                     new ScenarioResourceState(),
                     new ScenarioPublishedLinks(),
                     new ScenarioRegeneration(ScenarioModule.FIXED_CLOCK),
                     new ScenarioModuleDependencies(java.util.Map.of()),
-                    mock(ZipArchives.class))))
+                    mock(ZipArchives.class),
+                    mock(com.sitepark.ies.aggregator.port.IdSequence.class))))
         .getInstance(AssemblerFactory.class);
   }
 
