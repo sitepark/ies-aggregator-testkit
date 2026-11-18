@@ -1,0 +1,50 @@
+{
+  "sectionTypes": {
+    "named": {
+      "id": "named",
+      "aggregator": {
+        "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator",
+        "type": "probeType"
+      }
+    },
+    "configured": {
+      "id": "configured",
+      "aggregator": {
+        "className": "com.sitepark.ies.aggregator.testkit.probe.ConfigurableProbeAggregator",
+        "uri": "/aggregator/sectionTypes/configured.spml",
+        "classNameFor": "/aggregator/sectionTypes/configured.spml",
+        "colour": "red"
+      }
+    },
+    "inherited": {
+      "id": "inherited",
+      "aggregator": {
+        "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator",
+        "uri": "/aggregator/sectionTypes/own.spml",
+        "classNameFor": "/aggregator/sectionTypes/base.spml"
+      }
+    },
+    "legacy": {
+      "id": "legacy",
+      "enabled": false,
+      "aggregator": {
+        "uri": "/aggregator/sectionTypes/legacy.spml"
+      }
+    }
+  },
+  "fixedSectionTypes": [
+    null,
+    {
+      "id": "fixedNamed",
+      "aggregator": {
+        "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator"
+      }
+    }
+  ],
+  "repository": {
+    "1000": {
+      "id": 1000,
+      "content": {}
+    }
+  }
+}

@@ -206,6 +206,19 @@ public final class ScenarioContext {
   public static final String ID_SEQUENCE_KEY = "idSequence";
 
   /**
+   * Top-level key in a scenario file carrying the node the template has a container fill, as
+   * {@code sectionType.spml} holds it in {@code _sectionTypeArguments.container}: e.g. {@code
+   * {"type": "main", "id": "main", "items": [...]}}. While {@link #aggregateAsSection} plays the
+   * tag, the entries a container writes into the node {@value #CONTAINER_KEY} of the tag's root are
+   * appended to its {@code items}, as {@code AggregatorTag.mergeContainer} appends them, and the
+   * node is part of the result under the same key. An absent block means a caller without such a
+   * node: the entries are dropped, as in production. A container offers its section types under
+   * the scenario's top-level {@code sectionTypes} and {@code fixedSectionTypes}, as in a section
+   * type's configuration; see {@link #aggregator}.
+   */
+  public static final String CONTAINER_KEY = "container";
+
+  /**
    * Id of the repository entry the aggregation starts from in every scenario (by convention
    * {@code 1000}). {@link #aggregate} resolves it as the entry point of the aggregation and reuses
    * it as the id of the aggregated component.
@@ -243,6 +256,14 @@ public final class ScenarioContext {
   /** The section the container hands in - the scenario's {@link #SECTION_KEY}, if any. */
   private final @Nullable Map<String, Object> section;
 
+  /** The node the template has a container fill - the scenario's {@link #CONTAINER_KEY}, if any. */
+  private final @Nullable Map<String, Object> container;
+
+  /** The scenario's top level, as the section type whose offered section types it carries. */
+  private final Map<String, Object> rawSectionTypeConfig;
+
+  private final ScenarioSubAggregators subAggregators;
+
   private ScenarioContext(
       Repository repository,
       ScenarioLayout layout,
@@ -259,7 +280,9 @@ public final class ScenarioContext {
       ScenarioModuleDependencies moduleDependencies,
       ScenarioZipArchives zipArchives,
       Map<String, Object> enclosingResource,
-      @Nullable Map<String, Object> section) {
+      @Nullable Map<String, Object> section,
+      @Nullable Map<String, Object> container,
+      Map<String, Object> rawSectionTypeConfig) {
     this.repository = repository;
     this.layout = layout;
     this.injector = injector;
@@ -277,6 +300,10 @@ public final class ScenarioContext {
     this.zipArchives = zipArchives;
     this.enclosingResource = enclosingResource;
     this.section = section;
+    this.container = container;
+    this.rawSectionTypeConfig = rawSectionTypeConfig;
+    this.subAggregators =
+        new ScenarioSubAggregators(injector, jsonMapper, () -> channelProvider.current().nature());
   }
 
   /**
@@ -398,7 +425,9 @@ public final class ScenarioContext {
         moduleDependencies,
         zipArchives,
         enclosingResource(mapper, raw),
-        section(mapper, raw));
+        section(mapper, raw),
+        container(mapper, raw),
+        raw);
   }
 
   /**
@@ -414,6 +443,21 @@ public final class ScenarioContext {
     }
     return new LinkedHashMap<>(
         mapper.convertValue(section, new TypeReference<Map<String, Object>>() {}));
+  }
+
+  /**
+   * Reads the node the template has a container fill; absent means a caller without one. {@code
+   * null} is that absence, as for {@link #section}.
+   */
+  @SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull")
+  private static @Nullable Map<String, Object> container(
+      ObjectMapper mapper, Map<String, Object> raw) {
+    Object container = raw.get(CONTAINER_KEY);
+    if (container == null) {
+      return null;
+    }
+    return new LinkedHashMap<>(
+        mapper.convertValue(container, new TypeReference<Map<String, Object>>() {}));
   }
 
   /**
@@ -455,7 +499,11 @@ public final class ScenarioContext {
    * package-private on purpose, as production never calls them either. An aggregator that declares
    * {@link OptionsAware} is handed the scenario's options as well, again as production does it, so
    * a test never sets them by hand. One that declares {@link SectionTypeAware} is handed the
-   * scenario's {@link #SECTION_TYPE_KEY}, and fails to build without it.
+   * scenario's {@link #SECTION_TYPE_KEY}, and fails to build without it. A container ({@link
+   * com.sitepark.ies.aggregator.SubAggregatorAware}, {@link
+   * com.sitepark.ies.aggregator.SubSectionTypesAware}) is handed the children the scenario's
+   * top-level {@code sectionTypes} and {@code fixedSectionTypes} offer, built and configured as the
+   * production {@code AggregatorFactory} builds them - see {@link ScenarioSubAggregators}.
    *
    * @param type the aggregator class
    * @param <T> the aggregator type
@@ -478,6 +526,7 @@ public final class ScenarioContext {
     if (aggregator instanceof SectionTypeAware sectionTypeAware) {
       sectionTypeAware.setSectionType(this.sectionType(type));
     }
+    this.subAggregators.register(aggregator, this.rawSectionTypeConfig);
     return aggregator;
   }
 
@@ -548,7 +597,7 @@ public final class ScenarioContext {
    *
    * @return the type argument, or {@code null} if the declaration is raw
    */
-  private static @Nullable Class<?> declaredTypeArgument(
+  static @Nullable Class<?> declaredTypeArgument(
       Class<?> aggregatorType, Class<?> genericInterface) {
     for (Class<?> current = aggregatorType; current != null; current = current.getSuperclass()) {
       for (Type declared : current.getGenericInterfaces()) {
@@ -703,6 +752,7 @@ public final class ScenarioContext {
     for (Map.Entry<String, Object> entry : tagRoot.entries().entrySet()) {
       if (!this.layout.contentArea().equals(entry.getKey())
           && !SECTION_KEY.equals(entry.getKey())
+          && !CONTAINER_KEY.equals(entry.getKey())
           && entry.getValue() instanceof OutputObject area) {
         copyRendered(area, root.node(entry.getKey()));
       }
@@ -719,7 +769,37 @@ public final class ScenarioContext {
       this.mergeIntoSection(tagRoot);
       resource.put(SECTION_KEY, this.section);
     }
+    if (this.container != null) {
+      this.mergeIntoContainer(tagRoot);
+      resource.put(CONTAINER_KEY, this.container);
+    }
     return pretty(resource);
+  }
+
+  /**
+   * Appends the entries a container wrote to the node the template has it fill, the way {@code
+   * AggregatorTag.mergeContainer} does it: the rendered {@code items} of the tag root's node
+   * {@value #CONTAINER_KEY}, in their order, behind the items the node already holds. Entries that
+   * render empty are left out, as the tag's conversion leaves them out.
+   */
+  @SuppressWarnings(UNCHECKED)
+  private void mergeIntoContainer(OutputObject tagRoot) {
+    Map<String, Object> target = this.container;
+    if (target == null || !(tagRoot.entries().get(CONTAINER_KEY) instanceof OutputObject written)) {
+      return;
+    }
+    OutputObject rendered = new OutputObject(null, null);
+    copyRendered(written, rendered);
+    if (!(this.parse(toJson(rendered)).get(ITEMS) instanceof List<?> produced)
+        || produced.isEmpty()) {
+      return;
+    }
+    List<Object> items =
+        target.get(ITEMS) instanceof List<?> existing
+            ? new ArrayList<>(existing)
+            : new ArrayList<>();
+    items.addAll(produced);
+    target.put(ITEMS, items);
   }
 
   /**
