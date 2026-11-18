@@ -9,13 +9,17 @@ import com.sitepark.ies.aggregator.resolver.ResolverPath;
 import com.sitepark.ies.aggregator.resolver.Revision;
 import com.sitepark.ies.aggregator.resolver.User;
 import com.sitepark.ies.aggregator.value.ResolvedValue;
+import com.sitepark.ies.aggregator.value.SiteUrlMapping;
+import com.sitepark.ies.aggregator.value.UrlMappingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -24,9 +28,10 @@ import org.jspecify.annotations.Nullable;
  * {@link Resolver} view over a single {@link Repository} entry.
  *
  * <p>The access method decides how a field value is interpreted, matching the production semantics:
- * {@link #resolve(String)} treats a string as an id reference to another entry, whereas {@link
- * #value(String)} treats it as a scalar. This is why {@code parent} (navigated via {@code resolve})
- * follows a reference while {@code sp_imageCopyright} (read via {@code value}) stays a plain text.
+ * {@link #resolve(String)} navigates into objects only and refuses a leaf field, as production
+ * does, whereas {@link #value(String)} reads it as a scalar. Only the structural {@code parent}
+ * link is followed by {@code resolve} as a reference; {@code sp_imageCopyright} (read via {@code
+ * value}) stays a plain text, and a link field is followed with {@link #resolveLink(String)}.
  *
  * <p>An entry separates its structural metadata (its own {@code id}, an {@code anchor}, a {@code
  * parent} link, the {@code group} block, the {@code media} block, {@code media_options}, ...) from
@@ -55,10 +60,18 @@ import org.jspecify.annotations.Nullable;
  *     "rootSiteGroup": true,
  *     "micrositeRootSiteGroup": false,
  *     "subGroups": ["5100"],
- *     "entities": ["1000", "1330"]
+ *     "entities": ["1000", "1330"],
+ *     "urlMappings": [
+ *       {"path": "/kontakt", "ownerId": "1330", "mode": "FORWARD", "locale": "de_DE"}
+ *     ]
  *   }
  * }
  * }</pre>
+ *
+ * <p>The {@code urlMappings} block lists the mappings the platform would answer for the site, one per
+ * path (the platform keeps only the highest-priority one). {@code path}, {@code ownerId} and {@code
+ * mode} (a {@link UrlMappingMode} constant name) are required, {@code locale} is optional; a block
+ * that breaks this is rejected instead of being repaired. A group without the block has no mappings.
  *
  * <p>An entry without a {@code group} block keeps the neutral defaults (no children, no language, no
  * site-root marker); the presence of the block is also what makes an entry findable as a group by
@@ -103,6 +116,9 @@ final class RepositoryResolver implements GroupResolver {
 
   /** The key a link field wraps its target under ({@code {"link": "4711"}}). */
   private static final String LINK_KEY = "link";
+
+  /** Entry-level flag a scenario sets to declare the entry archived. */
+  private static final String ARCHIVE_KEY = "archive";
 
   /** Field a scenario spells out a section's own, reordering-stable id under. */
   private static final String UUID_KEY = "uuid";
@@ -186,10 +202,35 @@ final class RepositoryResolver implements GroupResolver {
     }
   }
 
+  /**
+   * Navigates into an object-valued field.
+   *
+   * <p>Only an object or a medium can be navigated into. In production a text, number, date, mail,
+   * url or link field is a {@code SimpleInformationVO}, and {@code ResolverContext.forInformation}
+   * refuses it with {@code UnsupportedOperationException: SimpleInformationVO not resolvable, use
+   * value() instead}; a link field is followed with {@link #resolveLink(String)} only. The harness
+   * refuses the same: a bare value, an id reference or a {@code {"link": ...}} wrapper is such a
+   * field. Answering it here let {@code resolve("sp_contactCityGov").resolveLink("link")} pass every
+   * scenario while every CityGov contact section failed on the CMS.
+   *
+   * @throws UnsupportedOperationException if the field is not an object
+   */
   @Override
   public Resolver resolve(String key) {
+    if (!PARENT_KEY.equals(key) && this.isLeafField(this.field(key))) {
+      throw new UnsupportedOperationException(
+          "SimpleInformationVO not resolvable, use value() instead: " + key);
+    }
     return this.resolverPath.descend(
         key, (path) -> this.repository.toResolver(path, this.field(key), this.keyOfChild(key)));
+  }
+
+  /** Whether a raw field value is one production holds as a {@code SimpleInformationVO}. */
+  private boolean isLeafField(@Nullable Object value) {
+    return value instanceof String
+        || value instanceof Number
+        || value instanceof Boolean
+        || (value instanceof Map<?, ?> map && map.get(LINK_KEY) != null);
   }
 
   /**
@@ -252,6 +293,31 @@ final class RepositoryResolver implements GroupResolver {
   }
 
   /**
+   * Follows every link of a field that names groups, written like {@link #resolveLinks(String)}
+   * writes several links. Only a group entry is followed, as {@link #resolveGroupLink(String)}
+   * follows one; anything else is left out.
+   */
+  @Override
+  public List<GroupResolver> resolveGroupLinks(String key) {
+    Object value = this.linkValue(key);
+    List<?> targets =
+        value instanceof List<?> list ? list : value == null ? List.of() : List.of(value);
+    List<GroupResolver> linked = new ArrayList<>();
+    for (Object target : targets) {
+      if (!this.repository.namesAGroup(target)) {
+        continue;
+      }
+      Resolver resolver =
+          this.resolverPath.descend(
+              key, (path) -> this.repository.toResolver(path, target, this.keyOfChild(key)));
+      if (resolver instanceof GroupResolver group && !group.isEmpty()) {
+        linked.add(group);
+      }
+    }
+    return List.copyOf(linked);
+  }
+
+  /**
    * Follows a link field that names a group - a scenario writes it like any link, as the id of a
    * group entry or wrapped under {@code "link"}. Only a group entry is followed, as production
    * follows the link through its pool loader; anything else answers the empty group.
@@ -290,6 +356,30 @@ final class RepositoryResolver implements GroupResolver {
       }
     }
     return List.copyOf(referrers);
+  }
+
+  /**
+   * The id the link field stores for its first target, as written - the target need not be an
+   * entry of the repository, as a pool of the user repository is not. Production reads the id from
+   * the field without loading the target, so the scenario writes it in the qualified form the
+   * aggregator is meant to see; the testkit does not translate it. An id reference ({@code $ref})
+   * answers the id it references. A field that holds no id - absent, empty, an inline object -
+   * answers the empty string.
+   *
+   * <p>A bare string is a link only where it names an entry, as for {@link #resolveLink(String)};
+   * anything else is the text of a plain field, for which production answers the empty string. A
+   * target outside the scenario is written under the {@code "link"} key.
+   */
+  @Override
+  public String linkTargetId(String key) {
+    boolean wrapped = this.field(key) instanceof Map<?, ?> map && map.get(LINK_KEY) != null;
+    Object value = this.linkValue(key);
+    Object first =
+        value instanceof List<?> list ? (list.isEmpty() ? null : list.getFirst()) : value;
+    if (first instanceof String id) {
+      return wrapped || this.repository.namesAnEntry(id) ? id : "";
+    }
+    return first instanceof Map<?, ?> node && node.get("$ref") instanceof String refId ? refId : "";
   }
 
   /** The raw value of a link field, unwrapped from its {@code "link"} key if it has one. */
@@ -332,6 +422,17 @@ final class RepositoryResolver implements GroupResolver {
         user.value("lastName").asString(""));
   }
 
+  /**
+   * The elements of a list field - and only of a list field. Production answers none for anything
+   * else: {@code BaseInformationVOResolver.resolveList} returns the empty list unless the field is
+   * a {@code ListInformationVO}, so a field that holds one object ({@code BaseInformationVO}), a
+   * leaf (text, link, ...) or nothing has no elements there. Answering a one-element list for an
+   * object field let a port iterate a field it has to read with {@link #resolve(String)}.
+   *
+   * <p>Only an object element is an item: production keeps just the {@code ListItemInformationVO}
+   * entries of the list and skips every other. An element that is no object is skipped here, and
+   * the elements after it keep the index they have in the list.
+   */
   @Override
   public List<Resolver> resolveList(String key) {
     Object value = this.field(key);
@@ -339,6 +440,9 @@ final class RepositoryResolver implements GroupResolver {
       List<Resolver> resolvers = new ArrayList<>();
       for (int index = 0; index < list.size(); index++) {
         Object element = list.get(index);
+        if (!(element instanceof Map)) {
+          continue;
+        }
         // The position belongs in the key, exactly as it does in production: without it every
         // element of the list would inherit the same one.
         String childKey = this.keyOfChild(key + '[' + index + ']');
@@ -347,11 +451,6 @@ final class RepositoryResolver implements GroupResolver {
                 key, (path) -> this.repository.toResolver(path, element, childKey)));
       }
       return resolvers;
-    }
-    if (value instanceof Map) {
-      return List.of(
-          this.resolverPath.descend(
-              key, (path) -> this.repository.toResolver(path, value, this.keyOfChild(key))));
     }
     return List.of();
   }
@@ -476,6 +575,11 @@ final class RepositoryResolver implements GroupResolver {
     return this.node.containsKey(CONTENT_KEY);
   }
 
+  /** The {@code id} of the node, empty if it has none; names the node for scenario blocks. */
+  String entryId() {
+    return this.structural("id").asString("");
+  }
+
   /** Reads the entry's structural metadata, which no field access may reach. */
   private ResolvedValue structural(String key) {
     Object value = this.node.get(key);
@@ -561,6 +665,22 @@ final class RepositoryResolver implements GroupResolver {
           : EntityKind.PAGE;
     }
 
+    /**
+     * Answers the entry's {@code "archive": true}; absent or anything else is {@code false}.
+     *
+     * <p>A group or a medium answers {@code false} whatever the entry declares: production decides
+     * the archive state for articles only, and a harness that let a group be archived would pass a
+     * scenario production can never reach.
+     */
+    @Override
+    public boolean isArchive() {
+      EntityKind kind = this.kind();
+      if (kind == EntityKind.GROUP || kind == EntityKind.MEDIA) {
+        return false;
+      }
+      return Boolean.TRUE.equals(RepositoryResolver.this.node.get(ARCHIVE_KEY));
+    }
+
     @Override
     public Revision created() {
       return revision("created");
@@ -584,6 +704,56 @@ final class RepositoryResolver implements GroupResolver {
     @Override
     public String lang() {
       return group().get("lang") instanceof String lang ? lang : "";
+    }
+
+    @Override
+    public List<SiteUrlMapping> urlMappings() {
+      if (group().get("urlMappings") == null) {
+        return List.of();
+      }
+      if (!(group().get("urlMappings") instanceof List<?> entries)) {
+        throw new IllegalArgumentException("urlMappings must be a list");
+      }
+      List<SiteUrlMapping> mappings = new ArrayList<>();
+      Set<String> paths = new HashSet<>();
+      for (Object entry : entries) {
+        SiteUrlMapping mapping = urlMapping(entry);
+        if (!paths.add(mapping.path())) {
+          throw new IllegalArgumentException(
+              "urlMappings names the path " + mapping.path() + " twice");
+        }
+        mappings.add(mapping);
+      }
+      return List.copyOf(mappings);
+    }
+
+    private SiteUrlMapping urlMapping(Object entry) {
+      if (!(entry instanceof Map<?, ?> map)) {
+        throw new IllegalArgumentException("a urlMappings entry must be an object: " + entry);
+      }
+      String path = requiredText(map, "path");
+      String ownerId = requiredText(map, "ownerId");
+      UrlMappingMode mode;
+      try {
+        mode = UrlMappingMode.valueOf(requiredText(map, "mode"));
+      } catch (IllegalArgumentException e) {
+        throw new IllegalArgumentException("unknown mode in urlMappings entry " + map, e);
+      }
+      Object locale = map.get("locale");
+      return new SiteUrlMapping(
+          path,
+          ownerId,
+          mode,
+          locale == null ? null : Locale.forLanguageTag(locale.toString().replace('_', '-')));
+    }
+
+    private String requiredText(Map<?, ?> map, String key) {
+      Object value = map.get(key);
+      if (value == null || value.toString().isEmpty()) {
+        throw new IllegalArgumentException(
+            "a urlMappings entry needs a non-empty " + key + ": " + map);
+      }
+      return value.toString();
     }
 
     /**

@@ -6,11 +6,17 @@ import static org.mockito.Mockito.when;
 
 import com.sitepark.ies.aggregator.port.AssemblerChain;
 import com.sitepark.ies.aggregator.port.AssemblerFactory;
+import com.sitepark.ies.aggregator.port.CategoryRootProvider;
 import com.sitepark.ies.aggregator.port.Channel;
 import com.sitepark.ies.aggregator.port.ChannelProvider;
+import com.sitepark.ies.aggregator.port.ContentNotificationRecipientProvider;
+import com.sitepark.ies.aggregator.port.GlobalConfigProvider;
+import com.sitepark.ies.aggregator.port.HomepageProvider;
 import com.sitepark.ies.aggregator.port.MediaProvider;
 import com.sitepark.ies.aggregator.port.ObjectTypeConfigProvider;
+import com.sitepark.ies.aggregator.port.ObjectTypeEntities;
 import com.sitepark.ies.aggregator.port.VariantConfigProvider;
+import com.sitepark.ies.aggregator.port.ZipArchives;
 import com.sitepark.ies.aggregator.resolver.RootResolverFactory;
 import com.sitepark.ies.aggregator.testkit.chainfixture.ChainProbe;
 import com.sitepark.ies.aggregator.value.StructuredValueParser;
@@ -46,11 +52,21 @@ class ChainAssemblerFactoryTest {
                     channelProvider(),
                     mock(VariantConfigProvider.class),
                     mock(RootResolverFactory.class),
-                    mock(ObjectTypeConfigProvider.class),
+                    new InstallationPorts(
+                        mock(ObjectTypeConfigProvider.class),
+                        mock(GlobalConfigProvider.class),
+                        mock(HomepageProvider.class),
+                        mock(CategoryRootProvider.class),
+                        mock(ObjectTypeEntities.class),
+                        mock(ContentNotificationRecipientProvider.class),
+                        mock(com.sitepark.ies.aggregator.port.ContainerHierarchy.class)),
                     new PublisherPorts(
                         new ScenarioResourceState(),
                         new ScenarioPublishedLinks(),
-                        new ScenarioRegeneration(ScenarioBeans.FIXED_CLOCK)))))
+                        new ScenarioRegeneration(ScenarioBeans.FIXED_CLOCK),
+                        new ScenarioModuleDependencies(java.util.Map.of()),
+                        mock(ZipArchives.class),
+                        mock(com.sitepark.ies.aggregator.port.IdSequence.class)))))
         .getBean(AssemblerFactory.class);
   }
 

@@ -154,4 +154,36 @@ class RepositoryResolverLinkTest {
   void resolveGroupLinkAnswersNothingForAnUnknownId() {
     assertThat(pageLinking("4711").resolveGroupLink("sp_galleryGroup").isEmpty()).isTrue();
   }
+
+  @Test
+  void resolveGroupLinksFollowsEveryGroupInStoredOrder() {
+    Repository repository =
+        new Repository(
+            Map.of(
+                "1",
+                Map.of(
+                    "id", "1", "content", Map.of("sp_groups", Map.of("link", List.of("8", "7")))),
+                "7",
+                Map.of("id", "7", "group", Map.of()),
+                "8",
+                Map.of("id", "8", "group", Map.of())));
+    Resolver page = ResolverPath.createRoot(path -> repository.resolver(path, "1"));
+
+    assertThat(page.resolveGroupLinks("sp_groups"))
+        .extracting(group -> group.entity().id())
+        .containsExactly(8, 7);
+  }
+
+  @Test
+  void resolveGroupLinksLeavesOutAnEntityAndAnUnknownId() {
+    assertThat(pageLinking(List.of("2", "7", "4711")).resolveGroupLinks("sp_galleryGroup"))
+        .as("only the group, as production follows a link through its pool loader")
+        .extracting(group -> group.entity().id())
+        .containsExactly(7);
+  }
+
+  @Test
+  void resolveGroupLinksAnswersNothingForAnAbsentField() {
+    assertThat(pageLinking(List.of()).resolveGroupLinks("sp_other")).isEmpty();
+  }
 }

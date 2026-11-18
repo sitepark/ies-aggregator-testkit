@@ -163,7 +163,7 @@ final class ScenarioAssemblerFactory implements AssemblerFactory {
     try {
       return this.container.getBean(impl);
     } catch (BeansException e) {
-      throw new IllegalStateException("Cannot instantiate " + impl.getName(), e);
+      throw InjectionFailure.of("Cannot instantiate " + impl.getName(), e);
     }
   }
 }

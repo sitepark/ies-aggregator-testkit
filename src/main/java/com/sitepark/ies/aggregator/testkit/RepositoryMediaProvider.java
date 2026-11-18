@@ -15,6 +15,8 @@ import com.sitepark.ies.aggregator.value.media.ImageMetadata;
 import com.sitepark.ies.aggregator.value.media.Media;
 import com.sitepark.ies.aggregator.value.media.Origin;
 import com.sitepark.ies.aggregator.value.media.UnclassifiedMedia;
+import com.sitepark.ies.aggregator.value.media.Video;
+import java.time.Instant;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
@@ -23,9 +25,10 @@ import org.jspecify.annotations.Nullable;
  * the given resolver.
  *
  * <p>The block carries the binary asset facts (mime type, dimensions, an optional {@code
- * colorSwatch}, ...) and a nested {@code metadata} object (copyright, alternative text, ...) — the
- * same nesting as the legacy {@code binary.media} path. Only {@link Image} media is supported for
- * now, which is all the art-direction scenarios need. A missing {@code media} block yields {@link
+ * colorSwatch}, ...) and a nested {@code metadata} object (copyright, alternative text, an optional
+ * {@code digitalSourceType} of an image, an optional {@code lastModified} in epoch milliseconds, ...)
+ * — the same nesting as the legacy {@code binary.media} path. The {@code kind} is {@code image}
+ * (default), {@code document}, {@code video} or {@code unclassified}. A missing {@code media} block yields {@link
  * Optional#empty()}, simulating a link that resolves to no media.
  *
  * <p>The asset's object id is taken from the resolver's scope root, mirroring production: for an
@@ -52,8 +55,9 @@ final class RepositoryMediaProvider implements MediaProvider {
             nullableString(metadata, "copyright"),
             nullableString(metadata, "title"),
             nullableString(metadata, "description"),
-            null,
-            focalPoint(metadata.resolve("focalpoint")));
+            lastModified(metadata),
+            focalPoint(metadata.resolve("focalpoint")),
+            nullableString(metadata, "digitalSourceType"));
 
     return Optional.of(
         new Image(
@@ -76,7 +80,8 @@ final class RepositoryMediaProvider implements MediaProvider {
    *
    * <p>{@code unclassified} is the one the store itself cannot sort — a PostScript file, say. It
    * carries no kind-specific data, and a scenario needs it to show that a download link is built
-   * from the shared fields alone.
+   * from the shared fields alone. A {@code video} carries {@code width} and {@code height} like an
+   * image, {@code 0} where absent - the model's value for a video the store never analysed.
    */
   private static Media nonImage(String kind, Resolver resolver, Resolver media, Resolver metadata) {
     GenericMetadata genericMetadata =
@@ -85,7 +90,7 @@ final class RepositoryMediaProvider implements MediaProvider {
             nullableString(metadata, "copyright"),
             nullableString(metadata, "title"),
             nullableString(metadata, "description"),
-            null);
+            lastModified(metadata));
     int objectId = objectId(resolver);
     int id = media.value("id").asInt(0);
     String filename = media.value("filename").asString("");
@@ -107,6 +112,19 @@ final class RepositoryMediaProvider implements MediaProvider {
               genericMetadata,
               mediaOrigin,
               nullableString(media, "extractedContent"));
+      case "video" ->
+          new Video(
+              objectId,
+              id,
+              filename,
+              originFilename,
+              mimeType,
+              fileSize,
+              hash,
+              genericMetadata,
+              mediaOrigin,
+              media.value("width").asInt(0),
+              media.value("height").asInt(0));
       case "unclassified" ->
           new UnclassifiedMedia(
               objectId,
@@ -125,6 +143,16 @@ final class RepositoryMediaProvider implements MediaProvider {
   /** The id of the object the media belongs to, or {@code 0} if the scope root is not an entity. */
   private static int objectId(Resolver resolver) {
     return resolver.root() instanceof EntityResolver entity ? entity.entity().id() : 0;
+  }
+
+  /**
+   * The modification time of {@code media.metadata.lastModified}, given as epoch milliseconds - the
+   * unit the store keeps it in - or {@code null} if the fixture names none, as for an asset without
+   * a modification time.
+   */
+  private static @Nullable Instant lastModified(Resolver metadata) {
+    ResolvedValue value = metadata.value("lastModified");
+    return value.isEmpty() ? null : Instant.ofEpochMilli(value.asLong(0L));
   }
 
   private static @Nullable String nullableString(Resolver resolver, String key) {

@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.sitepark.ies.aggregator.Aggregator;
+import com.sitepark.ies.aggregator.Configurable;
+import com.sitepark.ies.aggregator.Configuration;
 import com.sitepark.ies.aggregator.Options;
 import com.sitepark.ies.aggregator.OptionsAware;
 import com.sitepark.ies.aggregator.RootAggregator;
+import com.sitepark.ies.aggregator.SectionTypeAware;
 import com.sitepark.ies.aggregator.output.Component;
 import com.sitepark.ies.aggregator.output.DomainObjectMapper;
 import com.sitepark.ies.aggregator.output.OutputList;
@@ -40,6 +43,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.GenericApplicationContext;
 
@@ -64,6 +68,8 @@ import org.springframework.context.support.GenericApplicationContext;
 @SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.ExcessiveImports"})
 public final class ScenarioContext {
 
+  private static final String UNCHECKED = "unchecked";
+
   /**
    * Base packages scanned for {@code @AssemblerBinding} classes by default. {@code com.sitepark}
    * covers the built-ins of the consuming project as well as any custom-extension project
@@ -77,6 +83,42 @@ public final class ScenarioContext {
    * options via {@link #options(Class)}.
    */
   public static final String OPTIONS_KEY = "options";
+
+  /**
+   * Top-level key in a scenario file naming the section type the aggregator under test serves, a
+   * non-blank string such as {@code "notification"}. It is what the production {@code
+   * AggregatorFactory} takes from the section type's configuration and hands to a {@link
+   * SectionTypeAware} aggregator. It is required by such an aggregator and never defaulted: a
+   * scenario without it fails when the aggregator is built.
+   */
+  public static final String SECTION_TYPE_KEY = "sectionType";
+
+  /**
+   * Top-level key in a scenario file carrying the user groups of the IES user repository: a map
+   * {@code anchor -> {"qualifiedId": "...", "members": [{"email": ["a@x", ...]}, ...]}}, what
+   * {@code ContentNotificationRecipientProvider.recipients} answers. A group the block does not
+   * name, or an absent block, answers empty.
+   */
+  public static final String USER_GROUPS_KEY = "userGroups";
+
+  /**
+   * Top-level key in a scenario file carrying the {@code aggregator} block of the section type's
+   * configuration, a map such as {@code {"module": "bottrop-module"}}: everything the block holds
+   * besides the class name and the registration. An aggregator that is {@link Configurable} is
+   * handed it as the {@code aggregator} part of its configuration, as {@code ConfigMapper} hands it
+   * in production.
+   */
+  public static final String AGGREGATOR_KEY = "aggregator";
+
+  /**
+   * Top-level key in a scenario file carrying the {@code template} block of the section type's
+   * configuration (the keys besides the template's uri), handed to a {@link Configurable}
+   * aggregator as the {@code template} part of its configuration.
+   */
+  public static final String TEMPLATE_KEY = "template";
+
+  /** The installed modules, a map {@code moduleId -> version}. */
+  public static final String MODULES_KEY = "modules";
 
   /**
    * Top-level key in a scenario file carrying the access restriction the channel reports for the
@@ -101,6 +143,14 @@ public final class ScenarioContext {
   public static final String OBJECT_TYPES_KEY = "objectTypes";
 
   /**
+   * Top-level key in a scenario file carrying the installation's global configuration: a map {@code
+   * entry name -> configuration}, what {@code GlobalConfigProvider.configuration} answers (SPML
+   * {@code system.config.global.<name>}). An entry the block does not name, or an absent block,
+   * answers empty - an unconfigured feature is off, as in production.
+   */
+  public static final String GLOBAL_KEY = "global";
+
+  /**
    * Top-level key in a scenario file carrying the {@link Repository}: a flat map {@code id ->
    * entry} of the objects the aggregation navigates (the section source and any linked objects).
    */
@@ -122,11 +172,37 @@ public final class ScenarioContext {
   public static final String ENCLOSING_RESOURCE_KEY = "enclosingResource";
 
   /**
+   * Top-level key in a scenario file carrying the section a container hands the section type, as
+   * {@code contentContainer.spml} passes {@code system.arguments.section}: e.g. {@code {"type":
+   * "section", "id": "section-1"}}. While {@link #aggregateAsSection} plays the tag, what the
+   * section type writes about its section is merged flat into that section's {@code model}, as the
+   * tag merges it, and the section is part of the result under the same key. An absent block means
+   * a section type outside any container: what it writes about a section is dropped, as in
+   * production.
+   */
+  public static final String SECTION_KEY = "section";
+
+  /**
    * Top-level key in a scenario file carrying what the channel says about itself: {@code {"nature":
    * "intranet", "attributes": {"name": "value"}, "tenantName": "Stadt"}}. An absent block means a
    * channel that declares none of them — the same answer a publisher with nothing configured gives.
    */
   public static final String CHANNEL_KEY = "channel";
+
+  /**
+   * Top-level key in a scenario file carrying the trees of the section containers, as the platform
+   * would answer them: a map {@code address -> list of nodes}. See {@link
+   * ScenarioContainerHierarchy} for the address and the nodes. An absent block means no container
+   * has any entries.
+   */
+  public static final String CONTAINERS_KEY = "containers";
+
+  /**
+   * Top-level key in a scenario file carrying how many ids the sections before the one under test
+   * already drew: a map {@code name -> count}, e.g. {@code {"text": 3}}. The next {@code text} id
+   * is then {@code text-4}. An absent block, or a name it does not hold, starts at 1.
+   */
+  public static final String ID_SEQUENCE_KEY = "idSequence";
 
   /**
    * Id of the repository entry the aggregation starts from in every scenario (by convention
@@ -136,6 +212,7 @@ public final class ScenarioContext {
   public static final String SOURCE_ID = "1000";
 
   private static final String ITEMS = "items";
+  private static final String MODEL = "model";
   private static final String TYPE = "type";
   private static final String ID = "id";
 
@@ -147,9 +224,13 @@ public final class ScenarioContext {
   private final ChannelProvider channelProvider;
   private final ObjectMapper jsonMapper;
   private final @Nullable Object rawOptions;
+  private final @Nullable Object rawSectionType;
+  private final Map<String, Object> rawConfiguration;
   private final ScenarioResourceState resourceState;
   private final ScenarioPublishedLinks publishedLinks;
   private final ScenarioRegeneration regeneration;
+  private final ScenarioModuleDependencies moduleDependencies;
+  private final ScenarioZipArchives zipArchives;
 
   /**
    * The resource as the template holds it between two sections - the scenario's {@link
@@ -157,6 +238,9 @@ public final class ScenarioContext {
    * sections aggregated on one context see each other as they do on one page.
    */
   private final Map<String, Object> enclosingResource;
+
+  /** The section the container hands in - the scenario's {@link #SECTION_KEY}, if any. */
+  private final @Nullable Map<String, Object> section;
 
   private ScenarioContext(
       Repository repository,
@@ -166,10 +250,15 @@ public final class ScenarioContext {
       ChannelProvider channelProvider,
       ObjectMapper jsonMapper,
       @Nullable Object rawOptions,
+      @Nullable Object rawSectionType,
+      Map<String, Object> rawConfiguration,
       ScenarioResourceState resourceState,
       ScenarioPublishedLinks publishedLinks,
       ScenarioRegeneration regeneration,
-      Map<String, Object> enclosingResource) {
+      ScenarioModuleDependencies moduleDependencies,
+      ScenarioZipArchives zipArchives,
+      Map<String, Object> enclosingResource,
+      @Nullable Map<String, Object> section) {
     this.repository = repository;
     this.layout = layout;
     this.container = container;
@@ -178,10 +267,15 @@ public final class ScenarioContext {
     this.channelProvider = channelProvider;
     this.jsonMapper = jsonMapper;
     this.rawOptions = rawOptions;
+    this.rawSectionType = rawSectionType;
+    this.rawConfiguration = rawConfiguration;
     this.resourceState = resourceState;
     this.publishedLinks = publishedLinks;
     this.regeneration = regeneration;
+    this.moduleDependencies = moduleDependencies;
+    this.zipArchives = zipArchives;
     this.enclosingResource = enclosingResource;
+    this.section = section;
   }
 
   /**
@@ -242,9 +336,16 @@ public final class ScenarioContext {
     ScenarioResourceState resourceState = new ScenarioResourceState();
     ScenarioPublishedLinks publishedLinks = new ScenarioPublishedLinks();
     ScenarioRegeneration regeneration = new ScenarioRegeneration(ScenarioBeans.FIXED_CLOCK);
+    ScenarioModuleDependencies moduleDependencies =
+        new ScenarioModuleDependencies(
+            raw.get(MODULES_KEY) == null
+                ? Map.of()
+                : mapper.convertValue(
+                    raw.get(MODULES_KEY), new TypeReference<Map<String, String>>() {}));
     ChannelProvider channelProvider =
         new ScenarioChannelProvider(
             repository, accessRestriction(mapper, raw), channelConfig(mapper, raw));
+    ScenarioZipArchives zipArchives = new ScenarioZipArchives(repository, channelProvider);
     // Only the ports are wired by hand; every assembler and every collaborator behind them is built
     // by the container from its @Inject constructor, the way the production container does it. Next
     // to them go the bindings the extensions of the scanned packages register, as in production,
@@ -260,9 +361,22 @@ public final class ScenarioContext {
             channelProvider,
             new ScenarioVariantConfigProvider(mapper, raw.get(VARIANT_CONFIG_KEY)),
             rootResolverFactory,
-            new ScenarioObjectTypeConfigProvider(
-                mapper, raw.get(OBJECT_TYPE_KEY), raw.get(OBJECT_TYPES_KEY)),
-            new PublisherPorts(resourceState, publishedLinks, regeneration)));
+            new InstallationPorts(
+                new ScenarioObjectTypeConfigProvider(
+                    mapper, raw.get(OBJECT_TYPE_KEY), raw.get(OBJECT_TYPES_KEY)),
+                new ScenarioGlobalConfigProvider(mapper, raw.get(GLOBAL_KEY)),
+                new ScenarioHomepageProvider(repository, raw.get(OBJECT_TYPES_KEY)),
+                new ScenarioCategoryRootProvider(repository),
+                new ScenarioObjectTypeEntities(repository),
+                new ScenarioContentNotificationRecipientProvider(mapper, raw.get(USER_GROUPS_KEY)),
+                new ScenarioContainerHierarchy(repository, SOURCE_ID, raw.get(CONTAINERS_KEY))),
+            new PublisherPorts(
+                resourceState,
+                publishedLinks,
+                regeneration,
+                moduleDependencies,
+                zipArchives,
+                new ScenarioIdSequence(raw.get(ID_SEQUENCE_KEY)))));
     registrations.add(context -> ScenarioBeans.instance(context, ScenarioFixture.class, fixture));
     registrations.add(ExtensionBindings.of(packages));
     ApplicationContext container = ScenarioContainer.start(registrations);
@@ -275,10 +389,30 @@ public final class ScenarioContext {
         channelProvider,
         mapper,
         rawOptions,
+        raw.get(SECTION_TYPE_KEY),
+        configuration(raw),
         resourceState,
         publishedLinks,
         regeneration,
-        enclosingResource(mapper, raw));
+        moduleDependencies,
+        zipArchives,
+        enclosingResource(mapper, raw),
+        section(mapper, raw));
+  }
+
+  /**
+   * Reads the section a container hands in; absent means a section type outside any container.
+   * {@code null} is that absence - an empty map would be a section without a single field.
+   */
+  @SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull")
+  private static @Nullable Map<String, Object> section(
+      ObjectMapper mapper, Map<String, Object> raw) {
+    Object section = raw.get(SECTION_KEY);
+    if (section == null) {
+      return null;
+    }
+    return new LinkedHashMap<>(
+        mapper.convertValue(section, new TypeReference<Map<String, Object>>() {}));
   }
 
   /**
@@ -319,17 +453,76 @@ public final class ScenarioContext {
    * <p>This is how a project reaches an aggregator of a library it extends - their constructors are
    * package-private on purpose, as production never calls them either. An aggregator that declares
    * {@link OptionsAware} is handed the scenario's options as well, again as production does it, so
-   * a test never sets them by hand.
+   * a test never sets them by hand. One that declares {@link SectionTypeAware} is handed the
+   * scenario's {@link #SECTION_TYPE_KEY}, and fails to build without it.
    *
    * @param type the aggregator class
    * @param <T> the aggregator type
    */
   public <T> T aggregator(Class<T> type) {
-    T aggregator = this.container.getBean(type);
+    T aggregator;
+    try {
+      aggregator = ScenarioAggregationScope.outside(() -> this.container.getBean(type));
+    } catch (BeansException e) {
+      throw InjectionFailure.of("Cannot build " + type.getName(), e);
+    }
+    if (aggregator instanceof Configurable<?> configurable) {
+      this.configure(configurable);
+    }
     if (aggregator instanceof OptionsAware<?> optionsAware) {
       this.setOptions(optionsAware);
     }
+    if (aggregator instanceof SectionTypeAware sectionTypeAware) {
+      sectionTypeAware.setSectionType(this.sectionType(type));
+    }
     return aggregator;
+  }
+
+  /**
+   * The configuration the scenario hands a {@link Configurable} aggregator, built the way {@code
+   * ConfigMapper.createConfig} builds it: a map of {@code options}, {@code template} and {@code
+   * aggregator}, each present only when the scenario's block is not empty, converted to the
+   * configuration type the aggregator declares. A scenario that has none of the blocks yields an
+   * empty configuration, not none - production does the same. An aggregator that declares {@link
+   * Configurable} raw has no configuration type and is not configured.
+   */
+  private <C extends Configuration> void configure(Configurable<C> configurable) {
+    @SuppressWarnings(UNCHECKED)
+    Class<C> configurationType =
+        (Class<C>) declaredTypeArgument(configurable.getClass(), Configurable.class);
+    if (configurationType != null) {
+      configurable.configure(
+          this.jsonMapper.convertValue(this.rawConfiguration, configurationType));
+    }
+  }
+
+  /** The map {@code ConfigMapper.createConfig} converts: the non-empty blocks of the scenario. */
+  private static Map<String, Object> configuration(Map<String, Object> raw) {
+    Map<String, Object> configuration = new LinkedHashMap<>();
+    for (String key : List.of(OPTIONS_KEY, TEMPLATE_KEY, AGGREGATOR_KEY)) {
+      if (raw.get(key) instanceof Map<?, ?> block && !block.isEmpty()) {
+        configuration.put(key, block);
+      }
+    }
+    return configuration;
+  }
+
+  /**
+   * The section type id the scenario names. Production hands a {@link SectionTypeAware} aggregator
+   * the id from the section type's configuration, which is never empty; the harness has no such
+   * configuration, so the scenario has to name it, and an id the scenario leaves out is not made
+   * up.
+   */
+  private String sectionType(Class<?> aggregatorType) {
+    if (this.rawSectionType instanceof String id && !id.isBlank()) {
+      return id;
+    }
+    throw new IllegalStateException(
+        aggregatorType.getName()
+            + " is SectionTypeAware, so the scenario must name its section type under '"
+            + SECTION_TYPE_KEY
+            + "' as a non-blank string, but it has: "
+            + this.rawSectionType);
   }
 
   /**
@@ -338,26 +531,28 @@ public final class ScenarioContext {
    * options} block.
    */
   private <O extends Options> void setOptions(OptionsAware<O> optionsAware) {
-    @SuppressWarnings("unchecked")
-    Class<O> optionType = (Class<O>) optionTypeOf(optionsAware.getClass());
+    @SuppressWarnings(UNCHECKED)
+    Class<O> optionType =
+        (Class<O>) declaredTypeArgument(optionsAware.getClass(), OptionsAware.class);
     if (optionType != null) {
       optionsAware.setOptions(this.options(optionType));
     }
   }
 
   /**
-   * The type argument the class declares for {@link OptionsAware}, walking up its superclasses - an
+   * The type argument the class declares for the given generic interface, walking up its superclasses - an
    * aggregator declares it on itself, but may inherit the declaration.
    *
-   * @return the option type, or {@code null} if the declaration is raw
+   * @return the type argument, or {@code null} if the declaration is raw
    */
-  private static @Nullable Class<?> optionTypeOf(Class<?> aggregatorType) {
+  private static @Nullable Class<?> declaredTypeArgument(
+      Class<?> aggregatorType, Class<?> genericInterface) {
     for (Class<?> current = aggregatorType; current != null; current = current.getSuperclass()) {
       for (Type declared : current.getGenericInterfaces()) {
         if (declared instanceof ParameterizedType parameterized
-            && parameterized.getRawType() == OptionsAware.class
-            && parameterized.getActualTypeArguments()[0] instanceof Class<?> optionType) {
-          return optionType;
+            && parameterized.getRawType() == genericInterface
+            && parameterized.getActualTypeArguments()[0] instanceof Class<?> argument) {
+          return argument;
         }
       }
     }
@@ -504,6 +699,7 @@ public final class ScenarioContext {
     copyRendered(aggregated, section);
     for (Map.Entry<String, Object> entry : tagRoot.entries().entrySet()) {
       if (!this.layout.contentArea().equals(entry.getKey())
+          && !SECTION_KEY.equals(entry.getKey())
           && entry.getValue() instanceof OutputObject area) {
         copyRendered(area, root.node(entry.getKey()));
       }
@@ -515,7 +711,36 @@ public final class ScenarioContext {
       container.addComponent(section);
     }
 
-    return pretty(this.mergeIntoEnclosing(this.parse(toJson(root))));
+    Map<String, Object> resource = this.mergeIntoEnclosing(this.parse(toJson(root)));
+    if (this.section != null) {
+      this.mergeIntoSection(tagRoot);
+      resource.put(SECTION_KEY, this.section);
+    }
+    return pretty(resource);
+  }
+
+  /**
+   * Merges what the section type wrote about its section into the section the container handed
+   * in, the way {@code AggregatorTag.mergeSection} does it: flat into the section's {@code model},
+   * which is created when the section has none yet. Entries that render empty are left out, as
+   * the tag's conversion leaves them out.
+   */
+  @SuppressWarnings(UNCHECKED)
+  private void mergeIntoSection(OutputObject tagRoot) {
+    Map<String, Object> target = this.section;
+    if (target == null || !(tagRoot.entries().get(SECTION_KEY) instanceof OutputObject written)) {
+      return;
+    }
+    OutputObject rendered = new OutputObject(null, null);
+    copyRendered(written, rendered);
+    Map<String, Object> model;
+    if (target.get(MODEL) instanceof Map<?, ?> existing) {
+      model = (Map<String, Object>) existing;
+    } else {
+      model = new LinkedHashMap<>();
+      target.put(MODEL, model);
+    }
+    model.putAll(this.parse(toJson(rendered)));
   }
 
   /**
@@ -526,7 +751,7 @@ public final class ScenarioContext {
    *
    * @return the resource as the page would hold it after this section
    */
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings(UNCHECKED)
   private Map<String, Object> mergeIntoEnclosing(Map<String, Object> written) {
     Map<String, Object> resource = new LinkedHashMap<>(written);
     for (Map.Entry<String, Object> entry : written.entrySet()) {
@@ -639,6 +864,28 @@ public final class ScenarioContext {
   }
 
   /**
+   * The module dependencies the aggregations of this context reported to the publisher - only on
+   * modules the scenario's {@link #MODULES_KEY} block installs, each once, in the order first
+   * reported.
+   *
+   * <p>Like the published links this lives beside the resource, not in it.
+   */
+  public List<ModuleDependency> moduleDependencies() {
+    return this.moduleDependencies.reported();
+  }
+
+  /**
+   * The zip archives the aggregations of this context had the publisher write, in the order they
+   * were created.
+   *
+   * <p>The archive lies beside the resource, not in it - only the link to it is part of the output
+   * - so no expectation file shows its entries; a test asks here instead.
+   */
+  public List<CreatedZipArchive> zipArchives() {
+    return this.zipArchives.created();
+  }
+
+  /**
    * The channel the scenario publishes into.
    *
    * <p>For a test that writes a document rather than comparing aggregated data: the writer needs
@@ -717,7 +964,7 @@ public final class ScenarioContext {
     }
   }
 
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings(UNCHECKED)
   private static Map<String, Object> repositoryEntries(String resource, Map<String, Object> raw) {
     Object repository = raw.get(REPOSITORY_KEY);
     if (!(repository instanceof Map)) {

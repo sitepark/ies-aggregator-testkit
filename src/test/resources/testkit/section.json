@@ -1,0 +1,14 @@
+{
+  "section": {
+    "type": "section",
+    "id": "section-1"
+  },
+  "repository": {
+    "1000": {
+      "id": 1000,
+      "content": {
+        "sp_headline": "Opens a section"
+      }
+    }
+  }
+}

@@ -4,15 +4,24 @@ import com.sitepark.ies.aggregator.AggregatorErrorHandler;
 import com.sitepark.ies.aggregator.AggregatorException;
 import com.sitepark.ies.aggregator.output.DomainObjectMapper;
 import com.sitepark.ies.aggregator.port.AssemblerFactory;
+import com.sitepark.ies.aggregator.port.CategoryRootProvider;
 import com.sitepark.ies.aggregator.port.Channel;
 import com.sitepark.ies.aggregator.port.ChannelProvider;
+import com.sitepark.ies.aggregator.port.ContainerHierarchy;
+import com.sitepark.ies.aggregator.port.ContentNotificationRecipientProvider;
+import com.sitepark.ies.aggregator.port.GlobalConfigProvider;
+import com.sitepark.ies.aggregator.port.HomepageProvider;
+import com.sitepark.ies.aggregator.port.IdSequence;
 import com.sitepark.ies.aggregator.port.ImageScaler;
 import com.sitepark.ies.aggregator.port.MediaProvider;
+import com.sitepark.ies.aggregator.port.ModuleDependencies;
 import com.sitepark.ies.aggregator.port.ObjectTypeConfigProvider;
+import com.sitepark.ies.aggregator.port.ObjectTypeEntities;
 import com.sitepark.ies.aggregator.port.PublishedLinks;
 import com.sitepark.ies.aggregator.port.Regeneration;
 import com.sitepark.ies.aggregator.port.ResourceState;
 import com.sitepark.ies.aggregator.port.VariantConfigProvider;
+import com.sitepark.ies.aggregator.port.ZipArchives;
 import com.sitepark.ies.aggregator.resolver.RootResolverFactory;
 import com.sitepark.ies.aggregator.value.StructuredValueParser;
 import java.time.Clock;
@@ -44,6 +53,7 @@ import org.springframework.context.support.GenericApplicationContext;
  *   <li>the {@link ImageScaler} is the deterministic {@link ScenarioImageScaler}.
  * </ul>
  */
+@SuppressWarnings("PMD.ExcessiveImports") // declares one stand-in per port, so imports every port
 final class ScenarioBeans implements Consumer<GenericApplicationContext> {
 
   /**
@@ -60,7 +70,7 @@ final class ScenarioBeans implements Consumer<GenericApplicationContext> {
   private final ChannelProvider channelProvider;
   private final VariantConfigProvider variantConfigProvider;
   private final RootResolverFactory rootResolverFactory;
-  private final ObjectTypeConfigProvider objectTypeConfigProvider;
+  private final InstallationPorts installationPorts;
   private final PublisherPorts publisherPorts;
 
   ScenarioBeans(
@@ -70,7 +80,7 @@ final class ScenarioBeans implements Consumer<GenericApplicationContext> {
       ChannelProvider channelProvider,
       VariantConfigProvider variantConfigProvider,
       RootResolverFactory rootResolverFactory,
-      ObjectTypeConfigProvider objectTypeConfigProvider,
+      InstallationPorts installationPorts,
       PublisherPorts publisherPorts) {
     this.assemblerPackages = assemblerPackages;
     this.mediaProvider = mediaProvider;
@@ -78,7 +88,7 @@ final class ScenarioBeans implements Consumer<GenericApplicationContext> {
     this.channelProvider = channelProvider;
     this.variantConfigProvider = variantConfigProvider;
     this.rootResolverFactory = rootResolverFactory;
-    this.objectTypeConfigProvider = objectTypeConfigProvider;
+    this.installationPorts = installationPorts;
     this.publisherPorts = publisherPorts;
   }
 
@@ -94,13 +104,31 @@ final class ScenarioBeans implements Consumer<GenericApplicationContext> {
     instance(context, MediaProvider.class, this.mediaProvider);
     instance(context, StructuredValueParser.class, this.parser);
     instance(context, ChannelProvider.class, this.channelProvider);
-    instance(context, Channel.class, this.channelProvider.current());
+    // Prototype, so every injection asks the scope again; it refuses while an aggregator is built
+    context.registerBean(
+        Channel.class.getName(),
+        Channel.class,
+        ScenarioAggregationScope.channel(this.channelProvider.current()),
+        definition -> definition.setScope(BeanDefinition.SCOPE_PROTOTYPE));
     instance(context, VariantConfigProvider.class, this.variantConfigProvider);
     instance(context, RootResolverFactory.class, this.rootResolverFactory);
-    instance(context, ObjectTypeConfigProvider.class, this.objectTypeConfigProvider);
+    instance(
+        context, ObjectTypeConfigProvider.class, this.installationPorts.objectTypeConfigProvider());
+    instance(context, GlobalConfigProvider.class, this.installationPorts.globalConfigProvider());
+    instance(context, HomepageProvider.class, this.installationPorts.homepageProvider());
+    instance(context, CategoryRootProvider.class, this.installationPorts.categoryRootProvider());
+    instance(context, ObjectTypeEntities.class, this.installationPorts.objectTypeEntities());
+    instance(
+        context,
+        ContentNotificationRecipientProvider.class,
+        this.installationPorts.contentNotificationRecipientProvider());
+    instance(context, ContainerHierarchy.class, this.installationPorts.containerHierarchy());
     instance(context, ResourceState.class, this.publisherPorts.resourceState());
     instance(context, PublishedLinks.class, this.publisherPorts.publishedLinks());
     instance(context, Regeneration.class, this.publisherPorts.regeneration());
+    instance(context, ModuleDependencies.class, this.publisherPorts.moduleDependencies());
+    instance(context, ZipArchives.class, this.publisherPorts.zipArchives());
+    instance(context, IdSequence.class, this.publisherPorts.idSequence());
     context.registerBeanDefinition(
         DomainObjectMapper.class.getName(),
         ScenarioContainer.definitionOf(ReflectiveDomainObjectMapper.class));
