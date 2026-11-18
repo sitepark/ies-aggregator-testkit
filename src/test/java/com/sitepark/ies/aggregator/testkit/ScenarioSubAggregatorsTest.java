@@ -76,15 +76,15 @@ class ScenarioSubAggregatorsTest {
         .isEqualTo(
             Map.of(
                 "named",
-                new SubSectionType("named", true, null, "probeType", null, null, null),
+                new SubSectionType("named", true, null, "probeType", null, null),
                 "configured",
-                new SubSectionType("configured", true, null, null, null, null, null),
+                new SubSectionType("configured", true, null, null, null, null),
                 "inherited",
-                new SubSectionType("inherited", true, null, null, null, null, null),
+                new SubSectionType("inherited", true, null, null, null, null),
                 "legacy",
-                new SubSectionType("legacy", false, null, null, null, null, null),
+                new SubSectionType("legacy", false, null, null, null, null),
                 "#fixed:1",
-                new SubSectionType("fixedNamed", true, null, null, null, null, null)));
+                new SubSectionType("fixedNamed", true, null, null, null, null)));
   }
 
   @Test
