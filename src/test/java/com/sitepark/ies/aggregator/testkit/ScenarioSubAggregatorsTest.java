@@ -72,19 +72,27 @@ class ScenarioSubAggregatorsTest {
         context("testkit/placing.json").aggregator(PlacingProbeAggregator.class);
 
     assertThat(container.subSectionTypes())
-        .as("also of those without Java, keyed as the children are")
+        .as("also of those without Java, keyed as the children are; not of one switched off")
         .isEqualTo(
             Map.of(
                 "named",
-                new SubSectionType("named", true, null, "probeType", null, null),
+                new SubSectionType("named", "probeType", null, null),
                 "configured",
-                new SubSectionType("configured", true, null, null, null, null),
+                new SubSectionType("configured", null, null, null),
                 "inherited",
-                new SubSectionType("inherited", true, null, null, null, null),
-                "legacy",
-                new SubSectionType("legacy", false, null, null, null, null),
+                new SubSectionType("inherited", null, null, null),
                 "#fixed:1",
-                new SubSectionType("fixedNamed", true, null, null, null, null)));
+                new SubSectionType("fixedNamed", null, null, null)));
+  }
+
+  @Test
+  void offersOnlyTheSectionTypesPlacedInTheChannelsNature() {
+    PlacingProbeAggregator container =
+        context("testkit/placing-natures.json").aggregator(PlacingProbeAggregator.class);
+
+    assertThat(container.subSectionTypes())
+        .as("natures lists the natures a type is placed in; the channel is an intranet")
+        .containsOnlyKeys("everywhere", "intranetOnly");
   }
 
   @Test

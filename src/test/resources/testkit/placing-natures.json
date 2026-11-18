@@ -1,0 +1,52 @@
+{
+  "channel": {
+    "nature": "intranet"
+  },
+  "sectionTypes": {
+    "everywhere": {
+      "id": "everywhere",
+      "aggregator": {
+        "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator"
+      }
+    },
+    "intranetOnly": {
+      "id": "intranetOnly",
+      "aggregator": {
+        "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator",
+        "natures": {
+          "intranet": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "internetOnly": {
+      "id": "internetOnly",
+      "aggregator": {
+        "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator",
+        "natures": {
+          "internet": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "intranetOff": {
+      "id": "intranetOff",
+      "aggregator": {
+        "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator",
+        "natures": {
+          "intranet": {
+            "enabled": false
+          }
+        }
+      }
+    }
+  },
+  "repository": {
+    "1000": {
+      "id": 1000,
+      "content": {}
+    }
+  }
+}

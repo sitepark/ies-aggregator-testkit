@@ -302,7 +302,8 @@ public final class ScenarioContext {
     this.section = section;
     this.container = container;
     this.rawSectionTypeConfig = rawSectionTypeConfig;
-    this.subAggregators = new ScenarioSubAggregators(injector, jsonMapper);
+    this.subAggregators =
+        new ScenarioSubAggregators(injector, jsonMapper, () -> channelProvider.current().nature());
   }
 
   /**

@@ -11,7 +11,6 @@ import com.sitepark.ies.aggregator.resolver.Resolver;
 import jakarta.inject.Inject;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * A container: it gets its children and their configuration as production hands them in, and
@@ -54,7 +53,7 @@ public final class PlacingProbeAggregator
     OutputList items = output.root().node("container").nodeList("items");
     for (Map.Entry<String, SubSectionType> offered : this.subSectionTypes.entrySet()) {
       Aggregator child = this.subAggregators.get(offered.getKey());
-      if (child == null || !offered.getValue().enabledFor(Optional.empty())) {
+      if (child == null) {
         continue;
       }
       OutputListItem item = items.addItem();

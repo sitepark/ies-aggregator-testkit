@@ -17,6 +17,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * Builds the children of a container from the section types it offers, the way the production
@@ -31,6 +33,11 @@ import java.util.Objects;
  * none, as in production; the map is not handed over when it is empty. A {@link
  * SubSectionTypesAware} aggregator gets the configuration of every offered section type, read with
  * {@link SubSectionType#of}, the method the production factory reads it with.
+ *
+ * <p>Only the section types placed in the scenario's channel are offered at all, as the production
+ * factory leaves the others out ({@code SectionType.placedIn}): a type switched off by {@code
+ * enabled: false}, or not enabled for the nature of the channel by {@code aggregator.natures}, gets
+ * neither an aggregator nor its configuration handed in.
  */
 final class ScenarioSubAggregators {
 
@@ -47,10 +54,17 @@ final class ScenarioSubAggregators {
 
   private final Injector injector;
   private final ObjectMapper mapper;
+  private final Supplier<Optional<String>> nature;
 
-  ScenarioSubAggregators(Injector injector, ObjectMapper mapper) {
+  /**
+   * @param nature the nature of the scenario's channel, asked only when a container offers section
+   *     types
+   */
+  ScenarioSubAggregators(
+      Injector injector, ObjectMapper mapper, Supplier<Optional<String>> nature) {
     this.injector = injector;
     this.mapper = mapper;
+    this.nature = nature;
   }
 
   /**
@@ -60,7 +74,7 @@ final class ScenarioSubAggregators {
    * @param sectionType the section type's configuration; only the section types it offers are read
    */
   void register(Object aggregator, Map<?, ?> sectionType) {
-    Map<String, Map<?, ?>> offered = offered(sectionType);
+    Map<String, Map<?, ?>> offered = this.placed(offered(sectionType));
     if (aggregator instanceof SubAggregatorAware subAggregatorAware) {
       Map<String, Aggregator> children = new LinkedHashMap<>();
       for (Map.Entry<String, Map<?, ?>> child : offered.entrySet()) {
@@ -79,10 +93,7 @@ final class ScenarioSubAggregators {
         types.put(
             child.getKey(),
             SubSectionType.of(
-                id(child.getKey(), config),
-                config.get("enabled"),
-                node(config, AGGREGATOR),
-                node(config, TEMPLATE)));
+                id(child.getKey(), config), node(config, AGGREGATOR), node(config, TEMPLATE)));
       }
       subSectionTypesAware.setSubSectionTypes(types);
     }
@@ -106,6 +117,36 @@ final class ScenarioSubAggregators {
       }
     }
     return offered;
+  }
+
+  private Map<String, Map<?, ?>> placed(Map<String, Map<?, ?>> offered) {
+    if (offered.isEmpty()) {
+      return offered;
+    }
+    Optional<String> channelNature = this.nature.get();
+    offered.values().removeIf(config -> !placedIn(config, channelNature));
+    return offered;
+  }
+
+  /**
+   * Whether an entry of the section type is placed in a channel of the given nature, as {@code
+   * SectionType.placedIn} and {@code sectionType.spml:15-22} decide it: not if {@code enabled} is
+   * false; and if both the channel has a nature and the type names natures, only if it is enabled
+   * for that very nature - a nature the list does not name is left out.
+   */
+  private static boolean placedIn(Map<?, ?> config, Optional<String> nature) {
+    Object enabled = config.get("enabled");
+    if (Boolean.FALSE.equals(enabled) || "false".equals(enabled)) {
+      return false;
+    }
+    Object natures = node(config, AGGREGATOR).get("natures");
+    // isNull in SPML: an absent value or an empty text is none, an empty map is not
+    if (nature.isEmpty() || nature.get().isEmpty() || natures == null || "".equals(natures)) {
+      return true;
+    }
+    return natures instanceof Map<?, ?> byNature
+        && byNature.get(nature.get()) instanceof Map<?, ?> setting
+        && (Boolean.TRUE.equals(setting.get("enabled")) || "true".equals(setting.get("enabled")));
   }
 
   /**
