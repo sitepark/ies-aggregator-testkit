@@ -27,7 +27,7 @@ class ScenarioModuleDependenciesTest {
     ScenarioModuleDependencies dependencies =
         new ScenarioModuleDependencies(Map.of("bottrop", "3.4.0"));
 
-    dependencies.dependsOn("wuppertal");
+    dependencies.dependsOn("customer-module");
 
     assertThat(dependencies.reported()).isEmpty();
   }
@@ -47,7 +47,7 @@ class ScenarioModuleDependenciesTest {
     ScenarioModuleDependencies dependencies =
         new ScenarioModuleDependencies(Map.of("bottrop", "3.4.0"));
 
-    assertThat(dependencies.version("wuppertal")).isEmpty();
+    assertThat(dependencies.version("customer-module")).isEmpty();
 
     assertThat(dependencies.reported()).isEmpty();
   }
