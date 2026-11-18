@@ -36,7 +36,7 @@ import org.jspecify.annotations.Nullable;
  * <p>The classes are discovered via {@link ClassGraph} rather than the production class finder,
  * which walks the entries of a registered extension JAR: a test has no JAR, only
  * {@code target/test-classes}. The scan is cached per package set, so a project can point the
- * harness at its own package (e.g. {@code com.sitepark.stuttgart.aggregator}) while its overriding
+ * harness at its own package (e.g. {@code com.example.customer.aggregator}) while its overriding
  * assemblers still win by priority.
  */
 final class ScenarioAssemblerFactory implements AssemblerFactory {

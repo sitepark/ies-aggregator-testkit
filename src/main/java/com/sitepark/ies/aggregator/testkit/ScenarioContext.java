@@ -74,7 +74,7 @@ public final class ScenarioContext {
   /**
    * Base packages scanned for {@code @AssemblerBinding} classes by default. {@code com.sitepark}
    * covers the built-ins of the consuming project as well as any custom-extension project
-   * underneath (e.g. {@code com.sitepark.stuttgart.aggregator}); use {@link #load(String,
+   * underneath (e.g. {@code com.example.customer.aggregator}); use {@link #load(String,
    * ScenarioLayout, String...)} to narrow or replace this.
    */
   public static final List<String> DEFAULT_ASSEMBLER_PACKAGES = List.of("com.sitepark");
@@ -323,7 +323,7 @@ public final class ScenarioContext {
    * the given base packages.
    *
    * <p>Custom-extension projects reusing this testkit point it at their own package(s) (e.g. {@code
-   * "com.sitepark.stuttgart.aggregator"}); their overriding assemblers still win by
+   * "com.example.customer.aggregator"}); their overriding assemblers still win by
    * {@code @AssemblerBinding} priority. Include the package of the library they extend too if its
    * built-ins are needed alongside.
    *
