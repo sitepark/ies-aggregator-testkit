@@ -81,7 +81,20 @@
           }
         }
       },
-      "__COMMENT__": "not a step"
+      "__COMMENT__": "not a step",
+      "textOrder": {
+        "order": "3",
+        "sectionTypes": {
+          "z": {
+            "aggregator": {
+              "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator"
+            }
+          }
+        }
+      },
+      "empty": {
+        "order": 4
+      }
     }
   },
   "repository": {

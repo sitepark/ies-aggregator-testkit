@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sitepark.ies.aggregator.testkit.probe.PlainProbeRootAggregatorFactory;
 import com.sitepark.ies.aggregator.testkit.probe.StepsProbeRootAggregatorFactory;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,21 +40,49 @@ class ScenarioRootStepsTest {
   @Test
   void placesTheSectionTypesOfTheStepsInOrder() throws JsonProcessingException {
     assertThat(values(steps(), "key"))
-        .as("first before the two late steps (tie in scenario order), a before b inside late")
-        .containsExactly("first/legacy", "first/tie", "late/a", "late/b", "alsoLate/a");
+        .as(
+            "first before the two late steps (tie in scenario order), a before b inside late; an"
+                + " order given as text counts as its number, a step without section types adds"
+                + " none")
+        .containsExactly(
+            "first/legacy", "first/tie", "late/a", "late/b", "alsoLate/a", "textOrder/z");
   }
 
   @Test
   void anSpmlOnlySectionTypeComesWithoutAnAggregator() throws JsonProcessingException {
     assertThat(values(steps(), "java"))
         .as("legacy has only its SPML aggregator; the mask without any is not placed at all")
-        .containsExactly("false", "true", "true", "true", "true");
+        .containsExactly("false", "true", "true", "true", "true", "true");
   }
 
   @Test
   void namesASectionTypeByItsIdElseByItsOwnKey() throws JsonProcessingException {
     assertThat(values(steps(), "id"))
         .as("the key's step part is no part of the id")
-        .containsExactly("legacy", "tie", "named-a", "b", "a");
+        .containsExactly("legacy", "tie", "named-a", "b", "a", "z");
+  }
+
+  @Test
+  void anObjectTypeWithoutStepsHandsInNone() throws JsonProcessingException {
+    ScenarioContext context =
+        ScenarioContext.load(
+            "testkit/steps-without-object-type.json",
+            LAYOUT,
+            "com.sitepark.ies.aggregator.testkit.probe");
+
+    assertThat(JSON.readTree(context.aggregateRoot(StepsProbeRootAggregatorFactory.class)))
+        .as("the factory runs, with nothing placed")
+        .isEmpty();
+  }
+
+  @Test
+  void aFactoryThatTakesNoStepsStillBuildsThePage() throws JsonProcessingException {
+    ScenarioContext context =
+        ScenarioContext.load(
+            "testkit/steps.json", LAYOUT, "com.sitepark.ies.aggregator.testkit.probe");
+
+    assertThat(JSON.readTree(context.aggregateRoot(PlainProbeRootAggregatorFactory.class)))
+        .as("its own aggregators run; it is handed nothing")
+        .hasSize(1);
   }
 }
