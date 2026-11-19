@@ -14,18 +14,18 @@ class ScenarioModuleDependenciesTest {
   @Test
   void recordsAnInstalledModuleWithItsVersionOnce() {
     ScenarioModuleDependencies dependencies =
-        new ScenarioModuleDependencies(Map.of("bottrop", "3.4.0"));
+        new ScenarioModuleDependencies(Map.of("customer", "3.4.0"));
 
-    dependencies.dependsOn("bottrop");
-    dependencies.dependsOn("bottrop");
+    dependencies.dependsOn("customer");
+    dependencies.dependsOn("customer");
 
-    assertThat(dependencies.reported()).containsExactly(new ModuleDependency("bottrop", "3.4.0"));
+    assertThat(dependencies.reported()).containsExactly(new ModuleDependency("customer", "3.4.0"));
   }
 
   @Test
   void dropsAModuleTheEnvironmentDoesNotKnow() {
     ScenarioModuleDependencies dependencies =
-        new ScenarioModuleDependencies(Map.of("bottrop", "3.4.0"));
+        new ScenarioModuleDependencies(Map.of("customer", "3.4.0"));
 
     dependencies.dependsOn("customer-module");
 
@@ -35,17 +35,17 @@ class ScenarioModuleDependenciesTest {
   @Test
   void answersTheInstalledVersionAndReportsTheDependency() {
     ScenarioModuleDependencies dependencies =
-        new ScenarioModuleDependencies(Map.of("bottrop", "3.4.0", "other", "1.0.0"));
+        new ScenarioModuleDependencies(Map.of("customer", "3.4.0", "other", "1.0.0"));
 
-    assertThat(dependencies.version("bottrop")).contains("3.4.0");
+    assertThat(dependencies.version("customer")).contains("3.4.0");
 
-    assertThat(dependencies.reported()).containsExactly(new ModuleDependency("bottrop", "3.4.0"));
+    assertThat(dependencies.reported()).containsExactly(new ModuleDependency("customer", "3.4.0"));
   }
 
   @Test
   void answersNothingAndReportsNothingForAModuleTheScenarioDoesNotName() {
     ScenarioModuleDependencies dependencies =
-        new ScenarioModuleDependencies(Map.of("bottrop", "3.4.0"));
+        new ScenarioModuleDependencies(Map.of("customer", "3.4.0"));
 
     assertThat(dependencies.version("customer-module")).isEmpty();
 
@@ -56,7 +56,7 @@ class ScenarioModuleDependenciesTest {
   void aScenarioWithoutModulesHasNoneInstalled() {
     ScenarioModuleDependencies dependencies = new ScenarioModuleDependencies(Map.of());
 
-    dependencies.dependsOn("bottrop");
+    dependencies.dependsOn("customer");
 
     assertThat(dependencies.reported()).isEmpty();
   }
