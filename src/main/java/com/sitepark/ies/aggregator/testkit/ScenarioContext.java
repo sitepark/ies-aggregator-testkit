@@ -16,6 +16,7 @@ import com.sitepark.ies.aggregator.Configuration;
 import com.sitepark.ies.aggregator.Options;
 import com.sitepark.ies.aggregator.OptionsAware;
 import com.sitepark.ies.aggregator.RootAggregator;
+import com.sitepark.ies.aggregator.RootAggregatorFactory;
 import com.sitepark.ies.aggregator.SectionTypeAware;
 import com.sitepark.ies.aggregator.output.Component;
 import com.sitepark.ies.aggregator.output.DomainObjectMapper;
@@ -509,14 +510,7 @@ public final class ScenarioContext {
    * @param <T> the aggregator type
    */
   public <T> T aggregator(Class<T> type) {
-    T aggregator;
-    try {
-      aggregator = ScenarioAggregationScope.outside(() -> this.injector.getInstance(type));
-    } catch (ConfigurationException e) {
-      throw InjectionFailure.of("Cannot build " + type.getName(), e);
-    } catch (ProvisionException e) {
-      throw InjectionFailure.of("Cannot build " + type.getName(), e);
-    }
+    T aggregator = this.instance(type);
     if (aggregator instanceof Configurable<?> configurable) {
       this.configure(configurable);
     }
@@ -901,6 +895,35 @@ public final class ScenarioContext {
   public String aggregate(Aggregator aggregator) {
     OutputObject root = new OutputObject(null, null);
     aggregator.aggregate(this.resolver(SOURCE_ID), root);
+    return toJson(root);
+  }
+
+  /** An instance from the scenario's injector, built outside an aggregation as production does. */
+  private <T> T instance(Class<T> type) {
+    try {
+      return ScenarioAggregationScope.outside(() -> this.injector.getInstance(type));
+    } catch (ConfigurationException e) {
+      throw InjectionFailure.of("Cannot build " + type.getName(), e);
+    } catch (ProvisionException e) {
+      throw InjectionFailure.of("Cannot build " + type.getName(), e);
+    }
+  }
+
+  /**
+   * Builds the page of the scenario's source with a root aggregator factory, the way the publisher
+   * does on the Java root path: the factory is created, handed the placed section types of the
+   * object type's steps (the scenario's {@link #OBJECT_TYPE_KEY} block, its {@code steps}) if it
+   * asks for them - see {@link ScenarioSubAggregators} - and then asked for the root aggregator of
+   * the source, which aggregates it.
+   *
+   * @param type the root aggregator factory under test
+   * @return the whole resource as normalized JSON, comparable with {@link #expected(String)}
+   */
+  public String aggregateRoot(Class<? extends RootAggregatorFactory> type) {
+    RootAggregatorFactory factory = this.instance(type);
+    this.subAggregators.registerSteps(factory, this.rawSectionTypeConfig.get(OBJECT_TYPE_KEY));
+    OutputObject root =
+        factory.create(Integer.parseInt(SOURCE_ID)).aggregate(this.resolver(SOURCE_ID));
     return toJson(root);
   }
 
