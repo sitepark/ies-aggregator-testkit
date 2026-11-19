@@ -105,7 +105,7 @@ public final class ScenarioContext {
 
   /**
    * Top-level key in a scenario file carrying the {@code aggregator} block of the section type's
-   * configuration, a map such as {@code {"module": "bottrop-module"}}: everything the block holds
+   * configuration, a map such as {@code {"module": "customer-module"}}: everything the block holds
    * besides the class name and the registration. An aggregator that is {@link Configurable} is
    * handed it as the {@code aggregator} part of its configuration, as {@code ConfigMapper} hands it
    * in production.

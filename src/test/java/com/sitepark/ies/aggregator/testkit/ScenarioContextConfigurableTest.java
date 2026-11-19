@@ -26,7 +26,7 @@ class ScenarioContextConfigurableTest {
         load("configurable").aggregator(ConfigurableProbeAggregator.class);
 
     assertThat(aggregator.config()).isNotNull();
-    assertThat(aggregator.config().aggregator()).containsEntry("module", "bottrop-module");
+    assertThat(aggregator.config().aggregator()).containsEntry("module", "customer-module");
   }
 
   @Test
