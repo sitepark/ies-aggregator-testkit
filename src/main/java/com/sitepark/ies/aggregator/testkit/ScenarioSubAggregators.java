@@ -13,12 +13,15 @@ import com.sitepark.ies.aggregator.SectionTypeAware;
 import com.sitepark.ies.aggregator.SubAggregatorAware;
 import com.sitepark.ies.aggregator.SubSectionType;
 import com.sitepark.ies.aggregator.SubSectionTypesAware;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Builds the children of a container from the section types it offers, the way the production
@@ -47,6 +50,9 @@ final class ScenarioSubAggregators {
   /** Key of the section types a container fixes by position. */
   static final String FIXED_SECTION_TYPES_KEY = "fixedSectionTypes";
 
+  /** Key of an object type's steps, each with its {@link #SECTION_TYPES_KEY}. */
+  static final String STEPS_KEY = "steps";
+
   private static final String AGGREGATOR = "aggregator";
   private static final String TEMPLATE = "template";
   private static final String OPTIONS = "options";
@@ -74,10 +80,57 @@ final class ScenarioSubAggregators {
    * @param sectionType the section type's configuration; only the section types it offers are read
    */
   void register(Object aggregator, Map<?, ?> sectionType) {
-    Map<String, Map<?, ?>> offered = this.placed(offered(sectionType));
-    if (aggregator instanceof SubAggregatorAware subAggregatorAware) {
+    this.hand(aggregator, this.placed(offered(sectionType)));
+  }
+
+  /**
+   * Hands a root aggregator factory the section types of its object type's steps, if it asks for
+   * them, as the production {@code StepSectionTypes} does: one flat sequence keyed {@code
+   * <step>/<section type>}, in the order {@code getResource.spml:146-175} walks them - the steps by
+   * {@code order}, within a step the section types by {@code order}, ties in the order of the
+   * scenario; a step or section type switched off or not enabled for the channel's nature is left
+   * out, and so is a section type without any aggregator (no {@code aggregator.uri} and no class).
+   * A section type with only its SPML aggregator is handed in without an aggregator.
+   *
+   * @param factory the root aggregator factory under test
+   * @param objectType the scenario's {@code objectType} block, whose {@code steps} are read; absent,
+   *     the object type has no steps
+   */
+  void registerSteps(Object factory, @Nullable Object objectType) {
+    if (!(factory instanceof SubAggregatorAware) && !(factory instanceof SubSectionTypesAware)) {
+      return;
+    }
+    Map<String, Map<?, ?>> placed = new LinkedHashMap<>();
+    if (objectType instanceof Map<?, ?> type && type.get(STEPS_KEY) instanceof Map<?, ?> steps) {
+      Optional<String> channelNature = this.nature.get();
+      for (Map.Entry<String, Map<?, ?>> step : sorted(steps)) {
+        if (placedIn(step.getValue(), channelNature)) {
+          placeStep(placed, step.getKey(), step.getValue(), channelNature);
+        }
+      }
+    }
+    this.hand(factory, placed);
+  }
+
+  /** Adds the placed section types of a placed step, keyed {@code <step>/<section type>}. */
+  private static void placeStep(
+      Map<String, Map<?, ?>> placed, String stepKey, Map<?, ?> step, Optional<String> nature) {
+    if (!(step.get(SECTION_TYPES_KEY) instanceof Map<?, ?> types)) {
+      return;
+    }
+    for (Map.Entry<String, Map<?, ?>> sectionType : sorted(types)) {
+      if (placedIn(sectionType.getValue(), nature)
+          && aggregates(node(sectionType.getValue(), AGGREGATOR))) {
+        placed.put(stepKey + "/" + sectionType.getKey(), sectionType.getValue());
+      }
+    }
+  }
+
+  /** Hands an aggregator or factory the placed section types and the aggregators of the Java ones. */
+  private void hand(Object target, Map<String, Map<?, ?>> placed) {
+    if (target instanceof SubAggregatorAware subAggregatorAware) {
       Map<String, Aggregator> children = new LinkedHashMap<>();
-      for (Map.Entry<String, Map<?, ?>> child : offered.entrySet()) {
+      for (Map.Entry<String, Map<?, ?>> child : placed.entrySet()) {
         if (runsInJava(node(child.getValue(), AGGREGATOR))) {
           children.put(child.getKey(), this.create(child.getKey(), child.getValue()));
         }
@@ -86,9 +139,9 @@ final class ScenarioSubAggregators {
         subAggregatorAware.setSubAggregators(children);
       }
     }
-    if (aggregator instanceof SubSectionTypesAware subSectionTypesAware) {
+    if (target instanceof SubSectionTypesAware subSectionTypesAware) {
       Map<String, SubSectionType> types = new LinkedHashMap<>();
-      for (Map.Entry<String, Map<?, ?>> child : offered.entrySet()) {
+      for (Map.Entry<String, Map<?, ?>> child : placed.entrySet()) {
         Map<?, ?> config = child.getValue();
         types.put(
             child.getKey(),
@@ -97,6 +150,36 @@ final class ScenarioSubAggregators {
       }
       subSectionTypesAware.setSubSectionTypes(types);
     }
+  }
+
+  /** The entries that are objects, by their {@code order}; the sort is stable, ties keep their order. */
+  private static List<Map.Entry<String, Map<?, ?>>> sorted(Map<?, ?> entries) {
+    List<Map.Entry<String, Map<?, ?>>> sorted = new ArrayList<>();
+    for (Map.Entry<?, ?> entry : entries.entrySet()) {
+      if (entry.getValue() instanceof Map<?, ?> config) {
+        sorted.add(Map.entry(String.valueOf(entry.getKey()), config));
+      }
+    }
+    sorted.sort(Comparator.comparingDouble(entry -> order(entry.getValue())));
+    return sorted;
+  }
+
+  /** The {@code order} of a step or section type, as Jackson binds it onto a {@code float}. */
+  private static float order(Map<?, ?> config) {
+    Object order = config.get("order");
+    if (order instanceof Number number) {
+      return number.floatValue();
+    }
+    if (order instanceof String text && !text.isBlank()) {
+      return Float.parseFloat(text.trim());
+    }
+    return 0f;
+  }
+
+  /** Whether a section type has an aggregator at all: a Java class, or an SPML {@code uri}. */
+  private static boolean aggregates(Map<?, ?> aggregator) {
+    return runsInJava(aggregator)
+        || (aggregator.get("uri") instanceof String uri && !uri.isBlank());
   }
 
   private static Map<String, Map<?, ?>> offered(Map<?, ?> sectionType) {
@@ -236,7 +319,9 @@ final class ScenarioSubAggregators {
 
   /** The id the configuration names the section type by, else its key. */
   private static String id(String key, Map<?, ?> config) {
-    return config.get("id") instanceof String id && !id.isBlank() ? id : key;
+    // a root factory's key is '<step>/<section type>'; the section type's own key is the last part
+    String own = key.substring(key.lastIndexOf('/') + 1);
+    return config.get("id") instanceof String id && !id.isBlank() ? id : own;
   }
 
   private static Map<?, ?> node(Map<?, ?> config, String key) {

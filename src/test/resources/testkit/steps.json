@@ -1,0 +1,106 @@
+{
+  "channel": {
+    "nature": "internet"
+  },
+  "objectType": {
+    "id": "content",
+    "steps": {
+      "late": {
+        "order": 2,
+        "sectionTypes": {
+          "b": {
+            "order": 2,
+            "aggregator": {
+              "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator"
+            }
+          },
+          "a": {
+            "id": "named-a",
+            "order": 1,
+            "aggregator": {
+              "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator"
+            }
+          }
+        }
+      },
+      "first": {
+        "order": 1,
+        "sectionTypes": {
+          "legacy": {
+            "order": 5,
+            "aggregator": {
+              "uri": "/aggregator/sectionTypes/legacy.spml"
+            }
+          },
+          "mask": {
+            "order": 5
+          },
+          "tie": {
+            "order": 5,
+            "aggregator": {
+              "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator"
+            }
+          }
+        }
+      },
+      "alsoLate": {
+        "order": 2,
+        "sectionTypes": {
+          "a": {
+            "aggregator": {
+              "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator"
+            }
+          }
+        }
+      },
+      "off": {
+        "order": 0,
+        "enabled": false,
+        "sectionTypes": {
+          "x": {
+            "aggregator": {
+              "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator"
+            }
+          }
+        }
+      },
+      "intranet": {
+        "order": 0,
+        "aggregator": {
+          "natures": {
+            "intranet": {
+              "enabled": true
+            }
+          }
+        },
+        "sectionTypes": {
+          "y": {
+            "aggregator": {
+              "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator"
+            }
+          }
+        }
+      },
+      "__COMMENT__": "not a step",
+      "textOrder": {
+        "order": "3",
+        "sectionTypes": {
+          "z": {
+            "aggregator": {
+              "className": "com.sitepark.ies.aggregator.testkit.probe.SectionTypeProbeAggregator"
+            }
+          }
+        }
+      },
+      "empty": {
+        "order": 4
+      }
+    }
+  },
+  "repository": {
+    "1000": {
+      "id": 1000,
+      "content": {}
+    }
+  }
+}
