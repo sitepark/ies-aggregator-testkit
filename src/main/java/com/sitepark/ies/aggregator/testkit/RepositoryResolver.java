@@ -4,6 +4,7 @@ import com.sitepark.ies.aggregator.resolver.EntityKind;
 import com.sitepark.ies.aggregator.resolver.EntityResolver;
 import com.sitepark.ies.aggregator.resolver.GroupDescriptor;
 import com.sitepark.ies.aggregator.resolver.GroupResolver;
+import com.sitepark.ies.aggregator.resolver.ReferrerLink;
 import com.sitepark.ies.aggregator.resolver.Resolver;
 import com.sitepark.ies.aggregator.resolver.ResolverPath;
 import com.sitepark.ies.aggregator.resolver.Revision;
@@ -21,6 +22,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
@@ -356,6 +358,52 @@ final class RepositoryResolver implements GroupResolver {
       }
     }
     return List.copyOf(referrers);
+  }
+
+  /**
+   * Every link to this entry with the node it is stored in, taken from the repository (see {@link
+   * Repository#referrerLinksOf(String, String)}). The referrer becomes a new root within this
+   * resolver's navigation chain, as for {@link #resolveReferrers(String)}; the scope is reached from
+   * it with the keys {@link #resolve(String)} and {@link #resolveList(String)} hand down.
+   */
+  @Override
+  public List<ReferrerLink> resolveReferrerLinks(String linkField) {
+    String id = this.structural("id").asString("");
+    if (id.isEmpty()) {
+      return List.of();
+    }
+    List<ReferrerLink> links = new ArrayList<>();
+    for (Repository.ReferrerPlace place : this.repository.referrerLinksOf(id, linkField)) {
+      RepositoryResolver referrer =
+          this.repository.enterRoot(this.resolverPath, place.referrerId());
+      if (referrer == null) {
+        continue;
+      }
+      RepositoryResolver scope = referrer;
+      for (Repository.Step step : place.scope()) {
+        scope =
+            step.index() < 0 ? scope.member(step.key()) : scope.element(step.key(), step.index());
+      }
+      links.add(new ReferrerLink(referrer, scope));
+    }
+    return List.copyOf(links);
+  }
+
+  /** The object a field holds, as {@link #resolve(String)} hands it down. */
+  private RepositoryResolver member(String key) {
+    Object value = this.field(key);
+    return (RepositoryResolver)
+        this.resolverPath.descend(
+            key, (path) -> this.repository.toResolver(path, value, this.keyOfChild(key)));
+  }
+
+  /** The element of a list field, as {@link #resolveList(String)} hands it down. */
+  private RepositoryResolver element(String key, int index) {
+    Object element = ((List<?>) Objects.requireNonNull(this.field(key))).get(index);
+    String childKey = this.keyOfChild(key + '[' + index + ']');
+    return (RepositoryResolver)
+        this.resolverPath.descend(
+            key, (path) -> this.repository.toResolver(path, element, childKey));
   }
 
   /**
