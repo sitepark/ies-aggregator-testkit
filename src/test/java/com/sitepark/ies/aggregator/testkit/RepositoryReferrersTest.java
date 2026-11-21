@@ -3,6 +3,7 @@ package com.sitepark.ies.aggregator.testkit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sitepark.ies.aggregator.resolver.EntityResolver;
+import com.sitepark.ies.aggregator.resolver.ReferrerLink;
 import com.sitepark.ies.aggregator.resolver.Resolver;
 import com.sitepark.ies.aggregator.resolver.ResolverPath;
 import java.util.LinkedHashMap;
@@ -165,5 +166,91 @@ class RepositoryReferrersTest {
     Resolver target = ResolverPath.createRoot(path -> repository.resolver(path, "1"));
 
     assertThat(((EntityResolver) target).resolveReferrers(FIELD)).isEmpty();
+  }
+
+  private static Map<String, Object> entry(String role, String link) {
+    Map<String, Object> entry = new LinkedHashMap<>();
+    entry.put("role", role);
+    entry.put("sp_parent_navigation", link);
+    return entry;
+  }
+
+  private static List<ReferrerLink> linksTo(Repository repository) {
+    Resolver target = ResolverPath.createRoot(path -> repository.resolver(path, "1"));
+    return ((EntityResolver) target).resolveReferrerLinks(FIELD);
+  }
+
+  @Test
+  void answersEveryLinkWithTheEntryThatHoldsIt() {
+    Repository repository =
+        repository(
+            "2",
+            page(
+                "2",
+                Map.of(
+                    "sp_parent_navigation_iterate",
+                    List.of(entry("first", "1"), entry("other", "9"), entry("second", "1")))));
+
+    List<ReferrerLink> links = linksTo(repository);
+
+    assertThat(links.stream().map(link -> link.parent().entity().id()))
+        .as("a referrer linking from two entries holds two links")
+        .containsExactly(2, 2);
+    assertThat(links.stream().map(link -> link.linkScope().value("role").asString("")))
+        .as("each link is answered with the entry it is stored in")
+        .containsExactly("first", "second");
+  }
+
+  @Test
+  void theScopeOfALinkOutsideAListIsTheReferrer() {
+    Repository repository = repository("2", page("2", Map.of("sp_parent_navigation", "1")));
+
+    List<ReferrerLink> links = linksTo(repository);
+
+    assertThat(links).hasSize(1);
+    assertThat(links.getFirst().linkScope())
+        .as("a field in no list is stored in the referrer itself")
+        .isSameAs(links.getFirst().parent());
+  }
+
+  @Test
+  void theScopeOfALinkInAnObjectIsThatObject() {
+    Repository repository = repository("2", page("2", Map.of("block", entry("in block", "1"))));
+
+    assertThat(
+            linksTo(repository).stream().map(link -> link.linkScope().value("role").asString("")))
+        .containsExactly("in block");
+  }
+
+  @Test
+  void aFieldLinksTheTargetOnceHoweverManyOfItsValuesNameIt() {
+    Repository repository =
+        repository("2", page("2", Map.of("sp_parent_navigation", List.of("1", "1"))));
+
+    assertThat(repository.referrerLinksOf("1", FIELD)).hasSize(1);
+  }
+
+  @Test
+  void theLinksLeaveOutAGroup() {
+    Repository repository =
+        repository(
+            "2",
+            Map.of("id", "2", "group", Map.of(), "content", Map.of("sp_parent_navigation", "1")));
+
+    assertThat(repository.referrerLinksOf("1", FIELD)).isEmpty();
+  }
+
+  @Test
+  void theResolverAnswersNoLinksWithoutReferrers() {
+    assertThat(linksTo(repository())).isEmpty();
+  }
+
+  @Test
+  void aNodeWithoutIdHasNoReferrerLinks() {
+    Repository repository = repository("2", page("2", Map.of("sp_parent_navigation", "1")));
+    Resolver block =
+        ResolverPath.createRoot(path -> repository.toResolver(path, Map.of("x", "y"), ""));
+
+    assertThat(((EntityResolver) block).resolveReferrerLinks(FIELD)).isEmpty();
   }
 }

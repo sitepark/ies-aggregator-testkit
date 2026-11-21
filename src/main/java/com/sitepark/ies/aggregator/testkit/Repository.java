@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -255,6 +256,96 @@ final class Repository {
           }
         });
     return List.copyOf(referrers);
+  }
+
+  /**
+   * One link to an entry, as {@link #referrerLinksOf(String, String)} finds it.
+   *
+   * @param referrerId the id of the entry that holds the link
+   * @param scope the steps from the referrer's {@code content} to the node that holds the link
+   *     field; empty when the field is in {@code content} itself
+   */
+  record ReferrerPlace(String referrerId, List<Step> scope) {}
+
+  /**
+   * One step into a nested node.
+   *
+   * @param key the field to step into
+   * @param index the position in the list the field holds, or {@code -1} if it holds an object
+   */
+  record Step(String key, int index) {}
+
+  /**
+   * Returns every link to the given entry with the place it is stored in - the links {@link
+   * #referrersOf(String, String)} counts once per referrer.
+   *
+   * <p>{@code linkField} is spelled and matched as there, with the same known generosity: the link
+   * type is ignored. A field links the target once, however many of its values name it - production
+   * keeps one link per field and target. Publication is not looked at, groups are left out, the
+   * order is that of the repository and, within an entry, of its content.
+   *
+   * @param targetId the id of the linked entry
+   * @param linkField the link field as a referrer stores it, {@code <field>.<type>}
+   */
+  List<ReferrerPlace> referrerLinksOf(String targetId, String linkField) {
+    int dot = linkField.lastIndexOf('.');
+    String field = dot < 0 ? linkField : linkField.substring(0, dot);
+    List<ReferrerPlace> places = new ArrayList<>();
+    this.entries.forEach(
+        (id, entry) -> {
+          if (!(entry instanceof Map) || this.isGroupEntry(id)) {
+            return;
+          }
+          if (asObjectMap(entry).get(CONTENT_KEY) instanceof Map<?, ?> content) {
+            collectLinks(
+                content,
+                field,
+                targetId,
+                new ArrayList<>(),
+                scope -> places.add(new ReferrerPlace(id, List.copyOf(scope))));
+          }
+        });
+    return List.copyOf(places);
+  }
+
+  /** Reports the scope of every {@code field} in the node, searched recursively, that links. */
+  private static void collectLinks(
+      Map<?, ?> node, String field, String targetId, List<Step> scope, Consumer<List<Step>> found) {
+    for (Map.Entry<?, ?> member : node.entrySet()) {
+      if (!(member.getKey() instanceof String key)) {
+        continue;
+      }
+      if (field.equals(key) && linksTo(member.getValue(), targetId)) {
+        found.accept(scope);
+      }
+      collectNestedLinks(key, member.getValue(), field, targetId, scope, found);
+    }
+  }
+
+  /** Searches the objects a field holds - itself, or the object elements of its list. */
+  private static void collectNestedLinks(
+      String key,
+      @Nullable Object value,
+      String field,
+      String targetId,
+      List<Step> scope,
+      Consumer<List<Step>> found) {
+    if (value instanceof Map<?, ?> nested) {
+      scope.add(new Step(key, -1));
+      collectLinks(nested, field, targetId, scope, found);
+      scope.removeLast();
+      return;
+    }
+    if (!(value instanceof List<?> list)) {
+      return;
+    }
+    for (int index = 0; index < list.size(); index++) {
+      if (list.get(index) instanceof Map<?, ?> element) {
+        scope.add(new Step(key, index));
+        collectLinks(element, field, targetId, scope, found);
+        scope.removeLast();
+      }
+    }
   }
 
   /** Whether the value, searched recursively, has a {@code field} that links {@code targetId}. */
