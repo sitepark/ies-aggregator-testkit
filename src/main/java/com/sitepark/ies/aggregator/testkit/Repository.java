@@ -116,6 +116,20 @@ final class Repository {
   }
 
   /**
+   * The object type of the entry with the given id, or {@code null} if the entry does not exist, is
+   * a group or names no {@code objectType}.
+   *
+   * @param id the entry id
+   */
+  @Nullable String objectTypeOfEntry(String id) {
+    Object entry = this.entries.get(id);
+    if (!(entry instanceof Map) || this.isGroupEntry(id)) {
+      return null;
+    }
+    return asObjectMap(entry).get(OBJECT_TYPE_KEY) instanceof String type ? type : null;
+  }
+
+  /**
    * Returns whether the entry with the given id exists and is a standalone medium - a resource whose
    * content <em>is</em> a media asset, carrying the {@code media} block at entry level.
    *

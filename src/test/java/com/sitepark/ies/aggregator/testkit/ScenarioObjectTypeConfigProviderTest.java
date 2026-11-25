@@ -7,60 +7,77 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/** The place-bound and the global object-type answers come from separate scenario blocks. */
+/**
+ * An object of the repository gets the configuration of its type from the {@code objectTypes}
+ * block; whatever that block does not cover is answered by the resource's {@code objectType} block.
+ */
 class ScenarioObjectTypeConfigProviderTest {
 
   record Menu(boolean putInMenuDefault) {}
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  @Test
-  void answersTheGlobalDefinitionOfANamedType() {
-    ScenarioObjectTypeConfigProvider provider =
-        new ScenarioObjectTypeConfigProvider(
-            MAPPER, null, Map.of("news", Map.of("putInMenuDefault", false)));
+  private static final Repository REPOSITORY =
+      new Repository(
+          Map.of(
+              "1", Map.of("id", "1", "objectType", "news"),
+              "2", Map.of("id", "2", "objectType", "content"),
+              "3", Map.of("id", "3"),
+              "4", Map.of("id", "4", "objectType", "news", "group", Map.of())));
 
-    assertThat(provider.typeConfiguration("news", Menu.class)).contains(new Menu(false));
+  private static ScenarioObjectTypeConfigProvider provider(Object objectType, Object objectTypes) {
+    return new ScenarioObjectTypeConfigProvider(MAPPER, REPOSITORY, objectType, objectTypes);
   }
 
   @Test
-  void answersEmptyForATypeTheScenarioDoesNotName() {
+  void anObjectGetsTheConfigurationOfItsType() {
     ScenarioObjectTypeConfigProvider provider =
-        new ScenarioObjectTypeConfigProvider(
-            MAPPER, null, Map.of("news", Map.of("putInMenuDefault", false)));
+        provider(null, Map.of("news", Map.of("putInMenuDefault", false)));
 
-    assertThat(provider.typeConfiguration("content", Menu.class)).isEmpty();
+    assertThat(provider.configuration(1, Menu.class))
+        .as("the news object should get the configuration of the type news")
+        .contains(new Menu(false));
   }
 
   @Test
-  void answersEmptyWithoutTheBlock() {
+  void theTypeOfTheObjectWinsOverTheResourceBlock() {
     ScenarioObjectTypeConfigProvider provider =
-        new ScenarioObjectTypeConfigProvider(MAPPER, null, null);
+        provider(
+            Map.of("putInMenuDefault", true), Map.of("news", Map.of("putInMenuDefault", false)));
 
-    assertThat(provider.typeConfiguration("news", Menu.class)).isEmpty();
+    assertThat(provider.configuration(1, Menu.class)).contains(new Menu(false));
   }
 
   @Test
-  void doesNotFeedTheGlobalAnswerFromTheObjectTypeBlock() {
+  void anObjectOfATypeTheMapDoesNotNameGetsTheResourceBlock() {
     ScenarioObjectTypeConfigProvider provider =
-        new ScenarioObjectTypeConfigProvider(MAPPER, Map.of("putInMenuDefault", true), null);
+        provider(
+            Map.of("putInMenuDefault", true), Map.of("news", Map.of("putInMenuDefault", false)));
 
-    assertThat(provider.typeConfiguration("news", Menu.class)).isEmpty();
-    assertThat(provider.configuration(1, Menu.class)).contains(new Menu(true));
+    assertThat(provider.configuration(2, Menu.class)).contains(new Menu(true));
+    assertThat(provider.configuration(3, Menu.class)).contains(new Menu(true));
+    assertThat(provider.configuration(99, Menu.class)).contains(new Menu(true));
   }
 
   @Test
-  void doesNotFeedThePlaceBoundAnswerFromTheGlobalBlock() {
+  void aGroupHasNoObjectType() {
     ScenarioObjectTypeConfigProvider provider =
-        new ScenarioObjectTypeConfigProvider(
-            MAPPER, null, Map.of("news", Map.of("putInMenuDefault", true)));
+        provider(null, Map.of("news", Map.of("putInMenuDefault", false)));
 
-    assertThat(provider.configuration(1, Menu.class)).isEmpty();
+    assertThat(provider.configuration(4, Menu.class)).isEmpty();
+  }
+
+  @Test
+  void anObjectCoveredByNeitherBlockIsNotConfigured() {
+    assertThat(provider(null, null).configuration(1, Menu.class)).isEmpty();
+    assertThat(
+            provider(null, Map.of("news", Map.of("putInMenuDefault", false)))
+                .configuration(2, Menu.class))
+        .isEmpty();
   }
 
   @Test
   void rejectsABlockThatIsNotAMap() {
-    assertThatThrownBy(() -> new ScenarioObjectTypeConfigProvider(MAPPER, null, "news"))
-        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> provider(null, "news")).isInstanceOf(IllegalArgumentException.class);
   }
 }

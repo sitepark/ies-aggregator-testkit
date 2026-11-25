@@ -132,15 +132,17 @@ public final class ScenarioContext {
   /**
    * Top-level key in a scenario file carrying the configuration of the resource's object type —
    * whether it is a home page, kept out of the index, and so on. A scenario describes one resource,
-   * so it configures one type. An absent block means the type is not configured.
+   * so it configures one type; it answers every object {@link #OBJECT_TYPES_KEY} does not cover. An
+   * absent block means the type is not configured.
    */
   public static final String OBJECT_TYPE_KEY = "objectType";
 
   /**
-   * Top-level key in a scenario file carrying the global object-type definitions: a map {@code type
-   * name -> configuration}, what {@code ObjectTypeConfigProvider.typeConfiguration} answers
-   * independent of where an object sits. It shares no data with {@link #OBJECT_TYPE_KEY}; a type
-   * the block does not name, or an absent block, answers empty.
+   * Top-level key in a scenario file carrying the configuration of the other objects' types: a map
+   * {@code type name -> configuration}. {@code ObjectTypeConfigProvider.configuration} answers an
+   * object of the repository with the entry of its {@code objectType}, as production answers it
+   * with the type's configuration in the group that offers it. The {@code home} flags of the map
+   * also decide which entries are the installation's home pages.
    */
   public static final String OBJECT_TYPES_KEY = "objectTypes";
 
@@ -392,7 +394,7 @@ public final class ScenarioContext {
             rootResolverFactory,
             new InstallationPorts(
                 new ScenarioObjectTypeConfigProvider(
-                    mapper, raw.get(OBJECT_TYPE_KEY), raw.get(OBJECT_TYPES_KEY)),
+                    mapper, repository, raw.get(OBJECT_TYPE_KEY), raw.get(OBJECT_TYPES_KEY)),
                 new ScenarioGlobalConfigProvider(mapper, raw.get(GLOBAL_KEY)),
                 new ScenarioHomepageProvider(repository, raw.get(OBJECT_TYPES_KEY)),
                 new ScenarioCategoryRootProvider(repository),
