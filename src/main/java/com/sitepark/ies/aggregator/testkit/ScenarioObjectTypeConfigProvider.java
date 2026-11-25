@@ -9,31 +9,41 @@ import org.jspecify.annotations.Nullable;
 /**
  * Answers the object-type configuration from the scenario.
  *
- * <p>{@link #configuration(int, Class)} - what applies to one object at its place - reads the
- * {@code objectType} block. A scenario describes one resource, so it configures one object type and
- * the object id is ignored. An absent block means the type is not configured at all - the case a
- * production aggregator also has to survive.
+ * <p>In production the configuration belongs to an object: the adapter reads the type of the
+ * object within the type of the group that offers it. The scenario stands for that with two blocks:
  *
- * <p>{@link #typeConfiguration(String, Class)} - the global definition of a type, independent of
- * where an object sits - reads the {@code objectTypes} block, a map {@code type name -> config}. The
- * two answers deliberately share no data: in production they come from different places (the group
- * type's offering versus the global type definition), so a scenario that wants both to agree has to
- * declare both. A type the block does not name, or a scenario without the block, answers empty.
+ * <ul>
+ *   <li>{@code objectTypes}, a map {@code type name -> config}: an object of the repository whose
+ *       {@code objectType} the map names gets the configuration of its type. This is how a scenario
+ *       configures the other objects an aggregation looks at - the children of a navigation, the
+ *       pages of a site.
+ *   <li>{@code objectType}: the configuration of the resource being aggregated. A scenario
+ *       describes one resource, so it answers every object the {@code objectTypes} map does not
+ *       cover.
+ * </ul>
+ *
+ * <p>An object covered by neither block is not configured - the case a production aggregator also
+ * has to survive.
  */
 final class ScenarioObjectTypeConfigProvider implements ObjectTypeConfigProvider {
 
   private final ObjectMapper mapper;
+  private final Repository repository;
   private final @Nullable Object rawObjectType;
-  private final Map<?, ?> globalTypes;
+  private final Map<?, ?> types;
 
   ScenarioObjectTypeConfigProvider(
-      ObjectMapper mapper, @Nullable Object rawObjectType, @Nullable Object rawObjectTypes) {
+      ObjectMapper mapper,
+      Repository repository,
+      @Nullable Object rawObjectType,
+      @Nullable Object rawObjectTypes) {
     this.mapper = mapper;
+    this.repository = repository;
     this.rawObjectType = rawObjectType;
     if (rawObjectTypes == null) {
-      this.globalTypes = Map.of();
+      this.types = Map.of();
     } else if (rawObjectTypes instanceof Map<?, ?> map) {
-      this.globalTypes = map;
+      this.types = map;
     } else {
       throw new IllegalArgumentException(
           "'objectTypes' must be a map of type name to configuration: " + rawObjectTypes);
@@ -42,15 +52,11 @@ final class ScenarioObjectTypeConfigProvider implements ObjectTypeConfigProvider
 
   @Override
   public <T> Optional<T> configuration(int objectId, Class<T> type) {
-    if (this.rawObjectType == null) {
-      return Optional.empty();
+    String objectType = this.repository.objectTypeOfEntry(String.valueOf(objectId));
+    Object raw = objectType == null ? null : this.types.get(objectType);
+    if (raw == null) {
+      raw = this.rawObjectType;
     }
-    return Optional.ofNullable(this.mapper.convertValue(this.rawObjectType, type));
-  }
-
-  @Override
-  public <T> Optional<T> typeConfiguration(String objectType, Class<T> type) {
-    Object raw = this.globalTypes.get(objectType);
     if (raw == null) {
       return Optional.empty();
     }
